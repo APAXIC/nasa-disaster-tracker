@@ -5,7 +5,8 @@ services:
       - "5000:5000"
     environment:
       - PORT=${PORT:-5000}
-      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@db:5432/nasa_eonet}
+      - DATABASE_URL=${DATABASE_URL}
+      - EONET_API_URL=${EONET_API_URL}
     volumes:
       - ./server:/app
       - /app/node_modules
@@ -17,9 +18,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=nasa_eonet
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-nasa_eonet}
     volumes:
       - pgdata:/var/lib/postgresql/data
 

@@ -1,6 +1,9 @@
 const db = require('../config/db');
+const { findEventsInRadius } = require('../services/eventService');
 
-// Fetch all active disaster events
+/**
+ * Fetch all active disaster events
+ */
 exports.getAllEvents = async (req, res) => {
   try {
     const events = await db('events')
@@ -24,7 +27,9 @@ exports.getAllEvents = async (req, res) => {
   }
 };
 
-// Perform spatial query to find events within a radius of given coordinates
+/**
+ * Perform spatial query to find events within a radius of given coordinates
+ */
 exports.getNearbyEvents = async (req, res) => {
   const { lat, lng, radius = 100 } = req.query;
 
@@ -34,25 +39,9 @@ exports.getNearbyEvents = async (req, res) => {
 
   const latitude = parseFloat(lat);
   const longitude = parseFloat(lng);
-  const radiusInMeters = parseFloat(radius) * 1000;
 
   try {
-    const nearbyEvents = await db('events')
-      .select(
-        'id',
-        'nasa_id',
-        'title',
-        'description',
-        db.raw('ST_Y(latest_location::geometry) as latitude'),
-        db.raw('ST_X(latest_location::geometry) as longitude'),
-        db.raw('ST_Distance(latest_location, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography) / 1000 as distance_km', [longitude, latitude])
-      )
-      .whereNull('closed_at')
-      .whereRaw(
-        'ST_DWithin(latest_location, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)',
-        [longitude, latitude, radiusInMeters]
-      )
-      .orderBy('distance_km', 'asc');
+    const nearbyEvents = await findEventsInRadius(latitude, longitude, radius);
 
     res.json({
       query: { latitude, longitude, radiusKm: parseFloat(radius) },
