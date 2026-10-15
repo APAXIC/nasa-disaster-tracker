@@ -7,12 +7,20 @@ require('dotenv').config();
 const { syncEonetEvents } = require('./services/eonetService');
 const eventRoutes = require('./routes/eventRoutes');
 const authRoutes = require('./routes/authRoutes');
-const watchZoneRoutes = require('./routes/watchZonesRoutes');
+const watchZoneRoutes = require('./routes/watchZoneRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  })
+);
 app.use(express.json());
 app.use(cookieParser());
 
@@ -20,6 +28,7 @@ app.use(cookieParser());
 app.use('/api/events', eventRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/watch-zones', watchZoneRoutes);
+app.use('/api/users', userRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Express server is running!' });

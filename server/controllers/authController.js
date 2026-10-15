@@ -128,3 +128,24 @@ exports.logout = async (req, res) => {
 
   res.json({ message: 'Logged out successfully' });
 };
+
+/**
+ * Get currently authenticated user profile
+ */
+exports.getCurrentUser = async (req, res) => {
+  try {
+    const user = await db('users')
+      .where({ id: req.user.userId })
+      .select('id', 'email', 'name', 'all_notifications_muted', 'created_at')
+      .first();
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    res.json({ user });
+  } catch (error) {
+    console.error('[Auth Me Error]:', error);
+    res.status(500).json({ error: 'Failed to retrieve user profile.' });
+  }
+};

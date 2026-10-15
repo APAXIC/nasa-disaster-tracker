@@ -8,7 +8,13 @@ exports.createWatchZone = async (req, res) => {
   const { name, latitude, longitude, radiusKm } = req.body;
   const userId = req.user.userId;
 
-  if (!name || !latitude || !longitude || !radiusKm) {
+  if (
+    typeof name !== 'string' ||
+    !name.trim() ||
+    latitude == null ||
+    longitude == null ||
+    radiusKm == null
+  ) {
     return res.status(400).json({ error: 'Name, latitude, longitude, and radiusKm are required' });
   }
 
@@ -118,7 +124,7 @@ exports.updateWatchZone = async (req, res) => {
     if (name) updateData.name = name;
     if (radiusKm) updateData.radius_km = radiusKm;
 
-    if (latitude && longitude) {
+    if (latitude != null && longitude != null) {
       updateData.location = db.raw('ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography', [
         longitude,
         latitude
