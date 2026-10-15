@@ -13,7 +13,6 @@ module.exports = (req, res, next) => {
     req.user = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
     next();
   } catch (error) {
-    // 401 triggers Axios interceptor on the frontend to attempt auto-refresh
     res.status(401).json({ error: 'Access token expired or invalid' });
   }
 };

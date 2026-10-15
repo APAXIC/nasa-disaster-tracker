@@ -8,7 +8,7 @@ const { syncEonetEvents } = require('./services/eonetService');
 const eventRoutes = require('./routes/eventRoutes');
 const authRoutes = require('./routes/authRoutes');
 const watchZoneRoutes = require('./routes/watchZoneRoutes');
-const userRoutes = require('./routes/userRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -28,7 +28,7 @@ app.use(cookieParser());
 app.use('/api/events', eventRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/watch-zones', watchZoneRoutes);
-app.use('/api/users', userRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Express server is running!' });

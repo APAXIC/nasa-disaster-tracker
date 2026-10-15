@@ -73,3 +73,51 @@ export const deleteWatchZone = async (id) => {
   const response = await api.delete(`/watch-zones/${id}`);
   return response.data;
 };
+
+export const fetchNotifications = async ({
+                                           unreadOnly = false,
+                                           watchZoneId,
+                                           unassigned = false
+                                         } = {}) => {
+  const params = {};
+
+  if (unreadOnly) params.unreadOnly = true;
+  if (watchZoneId != null) params.watchZoneId = watchZoneId;
+  if (unassigned) params.unassigned = true;
+
+  const response = await api.get('/notifications', { params });
+  return response.data;
+};
+
+export const markNotificationAsRead = async (notificationId) => {
+  const response = await api.patch(
+    `/notifications/${notificationId}/read`
+  );
+
+  return response.data;
+};
+
+export const markAllNotificationsAsRead = async () => {
+  const response = await api.patch('/notifications/read-all');
+
+  return response.data;
+};
+
+export const deleteNotification = async (notificationId) => {
+  const response = await api.delete(`/notifications/${notificationId}`);
+  return response.data;
+};
+
+export const deleteAllNotifications = async () => {
+  const response = await api.delete('/notifications');
+  return response.data;
+};
+
+export const setWatchZoneNotifications = async (zoneId, isMuted) => {
+  const response = await api.patch(
+    `/watch-zones/${zoneId}/notifications`,
+    { isMuted }
+  );
+
+  return response.data;
+};

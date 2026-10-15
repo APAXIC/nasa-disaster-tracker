@@ -4,6 +4,7 @@ import AuthModal from './components/AuthModal';
 import AppShell from './components/layout/AppShell';
 import EventsPanel from './components/panels/EventsPanel';
 import WatchZonesPanel from './components/panels/WatchZonesPanel.jsx';
+import NotificationsPanel from './components/panels/NotificationsPanel';
 import {
   fetchAllEvents,
   fetchNearbyEvents,
@@ -12,7 +13,13 @@ import {
   logoutUser,
   createWatchZone,
   updateWatchZone,
-  deleteWatchZone
+  deleteWatchZone,
+  fetchNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  deleteNotification,
+  deleteAllNotifications,
+  setWatchZoneNotifications
 } from './services/api';
 import {
   ExclamationTriangleIcon,
@@ -33,11 +40,24 @@ export default function App() {
   const [watchZones, setWatchZones] = useState([]);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState('');
 
   useEffect(() => {
     loadGlobalEvents();
     checkAuthSession();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      loadNotifications();
+    } else {
+      setNotifications([]);
+      setUnreadNotificationsCount(0);
+      setNotificationsError('');
+    }
+  }, [user]);
 
   const checkAuthSession = async () => {
     const accessToken = localStorage.getItem('accessToken');
@@ -73,6 +93,116 @@ export default function App() {
       setWatchZones(zones.data || zones || []);
     } catch (err) {
       console.error('Failed to load watch zones:', err);
+    }
+  };
+
+  const loadNotifications = async () => {
+    if (!user) {
+      setNotifications([]);
+      setUnreadNotificationsCount(0);
+      setNotificationsError('');
+      return;
+    }
+
+    setIsNotificationsLoading(true);
+    setNotificationsError('');
+
+    try {
+      const result = await fetchNotifications();
+
+      setNotifications(result.data || []);
+      setUnreadNotificationsCount(Number(result.unreadCount) || 0);
+    } catch (error) {
+      console.error('[Notifications Error]:', error);
+      setNotificationsError('Failed to load notifications.');
+    } finally {
+      setIsNotificationsLoading(false);
+    }
+  };
+
+  const handleMarkNotificationAsRead = async (notificationId) => {
+    try {
+      await markNotificationAsRead(notificationId);
+      await loadNotifications();
+    } catch (error) {
+      console.error('[Mark Notification Read Error]:', error);
+      setNotificationsError('Failed to mark notification as read.');
+    }
+  };
+
+  const handleMarkAllNotificationsAsRead = async () => {
+    try {
+      await markAllNotificationsAsRead();
+      await loadNotifications();
+    } catch (error) {
+      console.error('[Mark All Notifications Read Error]:', error);
+      setNotificationsError('Failed to mark notifications as read.');
+    }
+  };
+
+  const handleDeleteNotification = async (notificationId) => {
+    try {
+      await deleteNotification(notificationId);
+      await loadNotifications();
+    } catch (error) {
+      console.error('[Delete Notification Error]:', error);
+      setNotificationsError('Failed to delete notification.');
+    }
+  };
+
+  const handleDeleteAllNotifications = async () => {
+    try {
+      await deleteAllNotifications();
+      await loadNotifications();
+    } catch (error) {
+      console.error('[Delete All Notifications Error]:', error);
+      setNotificationsError('Failed to delete notifications.');
+    }
+  };
+
+  const handleToggleWatchZoneNotifications = async (zoneId, isMuted) => {
+    try {
+      await setWatchZoneNotifications(zoneId, isMuted);
+      await loadUserWatchZones();
+      await loadNotifications();
+    } catch (error) {
+      console.error('[Toggle Watch Zone Notifications Error]:', error);
+      setNotificationsError('Failed to update watch zone notification settings.');
+    }
+  };
+
+  const handleViewNotificationEvent = async (notification) => {
+    const matchesNotification = (event) =>
+      (notification.event_id != null &&
+        String(event.id) === String(notification.event_id)) ||
+      (notification.nasa_id != null &&
+        String(event.nasa_id) === String(notification.nasa_id));
+
+    try {
+      let matchingEvent = events.find(matchesNotification);
+
+      if (!matchingEvent) {
+        const result = await fetchAllEvents();
+        const allEvents = result.data || [];
+
+        setEvents(allEvents);
+        setIsSearchingNearby(false);
+        setUserLocation(null);
+
+        matchingEvent = allEvents.find(matchesNotification);
+      }
+
+      if (!matchingEvent) {
+        setNotificationsError('The event associated with this notification could not be found.');
+        return;
+      }
+
+      setSelectedEvent(matchingEvent);
+      setActivePanel('events');
+      setNotificationsError('');
+    } catch (error) {
+      console.error('[Open Notification Event Error]:', error);
+      setNotificationsError('Failed to open the event.');
     }
   };
 
@@ -133,16 +263,19 @@ export default function App() {
   const handleCreateWatchZone = async (zoneData) => {
     await createWatchZone(zoneData);
     await loadUserWatchZones();
+    await loadNotifications();
   };
 
   const handleUpdateWatchZone = async (id, zoneData) => {
     await updateWatchZone(id, zoneData);
     await loadUserWatchZones();
+    await loadNotifications();
   };
 
   const handleDeleteWatchZone = async (id) => {
     await deleteWatchZone(id);
     await loadUserWatchZones();
+    await loadNotifications();
   };
 
   const panelConfig = {
@@ -172,16 +305,27 @@ export default function App() {
           onCreateWatchZone={handleCreateWatchZone}
           onUpdateWatchZone={handleUpdateWatchZone}
           onDeleteWatchZone={handleDeleteWatchZone}
+          onToggleWatchZoneNotifications={handleToggleWatchZoneNotifications}
         />
       )
     },
-    notifications: {
+    'notifications': {
       title: 'Notifications',
       icon: BellIcon,
       content: (
-        <p className="text-sm text-gray-400">
-          Notifications will be implemented here.
-        </p>
+        <NotificationsPanel
+          notifications={notifications}
+          unreadCount={unreadNotificationsCount}
+          isLoading={isNotificationsLoading}
+          error={notificationsError}
+          watchZones={watchZones}
+          onRefresh={loadNotifications}
+          onMarkAsRead={handleMarkNotificationAsRead}
+          onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+          onDeleteNotification={handleDeleteNotification}
+          onDeleteAllNotifications={handleDeleteAllNotifications}
+          onViewEvent={handleViewNotificationEvent}
+        />
       )
     },
     settings: {

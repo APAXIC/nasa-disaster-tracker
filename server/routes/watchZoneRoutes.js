@@ -9,6 +9,8 @@ router.post('/', watchZoneController.createWatchZone);
 router.get('/', watchZoneController.getUserWatchZones);
 router.get('/:id', watchZoneController.getWatchZoneById);
 router.put('/:id', watchZoneController.updateWatchZone);
+router.patch('/:id/notifications', watchZoneController.setWatchZoneNotifications);
 router.delete('/:id', watchZoneController.deleteWatchZone);
+
 
 module.exports = router;

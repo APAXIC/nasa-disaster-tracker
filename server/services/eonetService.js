@@ -1,159 +1,245 @@
 const axios = require('axios');
-const webpush = require('web-push');
 const db = require('../config/db');
-
-// Configure Web Push VAPID keys if set in environment
-if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || 'mailto:admin@disaster-tracker.com',
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  );
-}
+const { notifyUserAboutEvent } = require('./notificationService');
 
 /**
- * Fetch events from NASA EONET v3 and sync them into PostgreSQL with PostGIS locations.
- * Evaluates active Watch Zones to issue in-app and Web Push alerts.
+ * Fetch events from NASA EONET and sync them into Postgres with PostGIS locations.
+ * Evaluate active Watch Zones to issue alerts.
  */
 async function syncEonetEvents() {
-  const eonetUrl = process.env.EONET_API_URL || 'https://eonet.gsfc.nasa.gov/api/v3/events?status=open';
+  const eonetUrl =
+    process.env.EONET_API_URL ||
+    'https://eonet.gsfc.nasa.gov/api/v3/events';
+
   console.log('[EONET Sync] Fetching events from NASA API...');
 
   try {
     const response = await axios.get(eonetUrl);
-    const events = response.data.events || [];
 
-    console.log(`[EONET Sync] Retrieved ${events.length} open events from NASA.`);
+    if (!response.data || !Array.isArray(response.data.events)) {
+      throw new Error('NASA EONET returned an invalid events response.');
+    }
+
+    const events = response.data.events;
+    const incomingIds = [...new Set(
+      events
+        .map((event) => event.id)
+        .filter((id) => typeof id === 'string' && id.length > 0)
+    )];
+
+    console.log(`[EONET Sync] Retrieved ${events.length} events from NASA.`);
+
+    let insertedCount = 0;
 
     for (const event of events) {
-      if (!event.geometry || event.geometry.length === 0) continue;
+      if (!event.id) {
+        console.warn('[EONET Sync] Skipping event without an ID.');
+        continue;
+      }
 
-      const latestGeo = event.geometry[event.geometry.length - 1];
-      const coordinates = latestGeo.coordinates;
+      const geometry = Array.isArray(event.geometry)
+        ? event.geometry
+        : [];
 
-      if (!coordinates || coordinates.length < 2) continue;
+      const latestGeo = geometry[geometry.length - 1];
+      const coordinates = latestGeo?.coordinates;
+
+      if (!coordinates || coordinates.length < 2) {
+        console.warn(
+          `[EONET Sync] Skipping insertion for ${event.id}: no usable location.`
+        );
+        continue;
+      }
 
       const [longitude, latitude] = coordinates;
-      const closedAt = event.closed ? new Date(event.closed) : null;
 
-      // 1. Upsert Main Event Record
-      const [insertedEvent] = await db('events')
+      if (
+        !Number.isFinite(longitude) ||
+        !Number.isFinite(latitude) ||
+        longitude < -180 ||
+        longitude > 180 ||
+        latitude < -90 ||
+        latitude > 90
+      ) {
+        console.warn(
+          `[EONET Sync] Skipping insertion for ${event.id}: invalid coordinates.`
+        );
+        continue;
+      }
+
+      const insertedRows = await db('events')
         .insert({
           nasa_id: event.id,
           title: event.title,
           description: event.description || '',
           link: event.link || '',
-          closed_at: closedAt,
-          latest_location: db.raw('ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography', [longitude, latitude]),
+          closed_at: event.closed ? new Date(event.closed) : null,
+          latest_location: db.raw(
+            'ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography',
+            [longitude, latitude]
+          ),
           last_synced_at: db.fn.now()
         })
         .onConflict('nasa_id')
-        .merge({
-          title: event.title,
-          description: event.description || '',
-          closed_at: closedAt,
-          latest_location: db.raw('ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography', [longitude, latitude]),
-          last_synced_at: db.fn.now()
-        })
-        .returning(['id', 'nasa_id', 'created_at', 'updated_at']);
+        .ignore()
+        .returning(['id', 'nasa_id']);
 
-      const isNewEvent = insertedEvent.created_at?.getTime() === insertedEvent.updated_at?.getTime();
+      const insertedEvent = insertedRows[0];
 
-      // 2. Upsert Categories & Junction Entries
-      if (event.categories && event.categories.length > 0) {
-        for (const cat of event.categories) {
+      if (!insertedEvent) {
+        continue;
+      }
+
+      insertedCount += 1;
+
+      if (Array.isArray(event.categories)) {
+        for (const category of event.categories) {
+          if (!category.id || !category.title) {
+            continue;
+          }
+
           await db('categories')
-            .insert({ id: cat.id, title: cat.title })
+            .insert({
+              id: category.id,
+              title: category.title
+            })
             .onConflict('id')
             .ignore();
 
           await db('event_categories')
-            .insert({ event_id: insertedEvent.id, category_id: cat.id })
+            .insert({
+              event_id: insertedEvent.id,
+              category_id: category.id
+            })
             .onConflict(['event_id', 'category_id'])
             .ignore();
         }
       }
 
-      // 3. Store Historical Trajectory Points (Wipe & Re-insert to prevent duplicates cleanly)
-      await db('event_geometries').where({ event_id: insertedEvent.id }).del();
+      for (const point of geometry) {
+        const pointCoordinates = point.coordinates;
 
-      for (const geoPoint of event.geometry) {
-        if (!geoPoint.coordinates || geoPoint.coordinates.length < 2) continue;
+        if (
+          !Array.isArray(pointCoordinates) ||
+          pointCoordinates.length < 2
+        ) {
+          continue;
+        }
 
-        const [pLng, pLat] = geoPoint.coordinates;
-        const recordedAt = new Date(geoPoint.date);
-        const magVal = geoPoint.magnitudeValue || null;
-        const magUnit = geoPoint.magnitudeUnit || null;
+        const [pointLongitude, pointLatitude] = pointCoordinates;
+
+        if (
+          !Number.isFinite(pointLongitude) ||
+          !Number.isFinite(pointLatitude) ||
+          pointLongitude < -180 ||
+          pointLongitude > 180 ||
+          pointLatitude < -90 ||
+          pointLatitude > 90
+        ) {
+          continue;
+        }
+
+        const recordedAt = point.date
+          ? new Date(point.date)
+          : new Date();
+
+        if (Number.isNaN(recordedAt.getTime())) {
+          continue;
+        }
 
         await db('event_geometries').insert({
           event_id: insertedEvent.id,
           recorded_at: recordedAt,
-          location: db.raw('ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography', [pLng, pLat]),
-          magnitude_value: magVal,
-          magnitude_unit: magUnit
+          location: db.raw(
+            'ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography',
+            [pointLongitude, pointLatitude]
+          ),
+          magnitude_value: point.magnitudeValue ?? null,
+          magnitude_unit: point.magnitudeUnit ?? null
         });
       }
 
-      // 4. Trigger Alerts for Active Watch Zones
-      if (isNewEvent && !closedAt) {
-        await processWatchZoneAlerts(insertedEvent.id, event.title, longitude, latitude);
+      if (!event.closed) {
+        await processWatchZoneAlerts(
+          insertedEvent.id,
+          event.title,
+          longitude,
+          latitude
+        );
       }
     }
 
-    console.log('[EONET Sync] Sync completed successfully.');
+    let closureQuery = db('events')
+      .whereNull('closed_at');
+
+    if (incomingIds.length > 0) {
+      closureQuery = closureQuery.whereNotIn('nasa_id', incomingIds);
+    }
+
+    const closedCount = await closureQuery.update({
+      closed_at: db.fn.now()
+    });
+
+    console.log(
+      `[EONET Sync] Completed. Inserted: ${insertedCount}; marked closed: ${closedCount}.`
+    );
   } catch (error) {
     console.error('[EONET Sync Error]:', error.message);
   }
 }
 
 /**
- * PostGIS Spatial Matcher: Evaluates unmuted watch zones overlapping with disaster coordinates
+ * Evaluate unmuted watch zones overlapping with disaster coordinates
  */
-async function processWatchZoneAlerts(eventId, eventTitle, longitude, latitude) {
+async function processWatchZoneAlerts(
+  eventId,
+  eventTitle,
+  longitude,
+  latitude
+) {
   try {
     const matchingZones = await db('watch_zones')
       .join('users', 'watch_zones.user_id', 'users.id')
       .select(
         'users.id as user_id',
-        'users.push_subscription',
         'watch_zones.id as watch_zone_id',
         'watch_zones.name as zone_name'
       )
       .where('watch_zones.is_muted', false)
       .where('users.all_notifications_muted', false)
       .whereRaw(
-        'ST_DWithin(watch_zones.location, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, watch_zones.radius_km * 1000)',
+        `ST_DWithin(
+          watch_zones.location,
+          ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography,
+          watch_zones.radius_km * 1000
+        )`,
         [longitude, latitude]
-      );
+      )
+      .orderBy('watch_zones.id', 'asc');
+
+    const notifiedUsers = new Set();
 
     for (const match of matchingZones) {
-      // Insert in-app notification record
-      await db('notifications').insert({
-        user_id: match.user_id,
-        watch_zone_id: match.watch_zone_id,
-        event_id: eventId,
-        title: `Disaster Alert: ${match.zone_name}`,
-        message: `${eventTitle} was detected inside your watch zone.`
+      if (notifiedUsers.has(match.user_id)) {
+        continue;
+      }
+
+      const created = await notifyUserAboutEvent({
+        userId: match.user_id,
+        eventId,
+        eventTitle,
+        watchZoneId: match.watch_zone_id,
+        zoneName: match.zone_name
       });
 
-      // Send Web Push Notification if browser subscription exists
-      if (match.push_subscription && process.env.VAPID_PUBLIC_KEY) {
-        const payload = JSON.stringify({
-          title: `⚠️ Alert: ${match.zone_name}`,
-          body: `${eventTitle} detected within radius!`,
-          eventId
-        });
-
-        webpush.sendNotification(match.push_subscription, payload).catch((err) => {
-          if (err.statusCode === 410 || err.statusCode === 404) {
-            db('users').where({ id: match.user_id }).update({ push_subscription: null });
-          }
-        });
+      if (created) {
+        notifiedUsers.add(match.user_id);
       }
     }
   } catch (error) {
     console.error('[WatchZone Alert Error]:', error.message);
   }
 }
+
 
 module.exports = { syncEonetEvents };

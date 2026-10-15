@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { findEventsInRadius } = require('../services/eventService');
+const { notifyZoneAboutActiveEvents } = require('../services/notificationService');
 
 /**
  * Create a new watch zone
@@ -28,6 +29,8 @@ exports.createWatchZone = async (req, res) => {
       })
       .returning(['id', 'name', 'radius_km', 'created_at']);
 
+    await notifyZoneAboutActiveEvents(userId, zone.id);
+
     res.status(201).json({ message: 'Watch zone created successfully', zone });
   } catch (error) {
     res.status(500).json({ error: 'Failed to create watch zone' });
@@ -46,6 +49,7 @@ exports.getUserWatchZones = async (req, res) => {
         'id',
         'name',
         'radius_km',
+        'is_muted',
         db.raw('ST_Y(location::geometry) as latitude'),
         db.raw('ST_X(location::geometry) as longitude')
       )
@@ -82,6 +86,7 @@ exports.getWatchZoneById = async (req, res) => {
         'id',
         'name',
         'radius_km',
+        'is_muted',
         db.raw('ST_Y(location::geometry) as latitude'),
         db.raw('ST_X(location::geometry) as longitude')
       )
@@ -132,6 +137,7 @@ exports.updateWatchZone = async (req, res) => {
     }
 
     await db('watch_zones').where({ id, user_id: userId }).update(updateData);
+    await notifyZoneAboutActiveEvents(userId, id);
 
     res.json({ message: 'Watch zone updated successfully' });
   } catch (error) {
@@ -156,5 +162,48 @@ exports.deleteWatchZone = async (req, res) => {
     res.json({ message: 'Watch zone deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete watch zone' });
+  }
+};
+
+/**
+ * Enable or mute notifications for a watch zone.
+ */
+exports.setWatchZoneNotifications = async (req, res) => {
+  const { id } = req.params;
+  const { isMuted } = req.body;
+  const userId = req.user.userId;
+
+  if (typeof isMuted !== 'boolean') {
+    return res.status(400).json({
+      error: 'isMuted must be a boolean.'
+    });
+  }
+
+  try {
+    const updatedCount = await db('watch_zones')
+      .where({
+        id,
+        user_id: userId
+      })
+      .update({
+        is_muted: isMuted,
+        updated_at: db.fn.now()
+      });
+
+    if (!updatedCount) {
+      return res.status(404).json({ error: 'Watch zone not found.' });
+    }
+
+    res.json({
+      message: isMuted
+        ? 'Notifications muted for this watch zone.'
+        : 'Notifications enabled for this watch zone.',
+      isMuted
+    });
+  } catch (error) {
+    console.error('[Set Watch Zone Notifications Error]:', error);
+    res.status(500).json({
+      error: 'Failed to update watch zone notification settings.'
+    });
   }
 };
