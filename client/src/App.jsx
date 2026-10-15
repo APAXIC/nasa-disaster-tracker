@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import Map from './components/Map';
-import NavigationOverlay from './components/NavigationOverlay';
+import Map from './components/map/Map.jsx';
 import AuthModal from './components/AuthModal';
+import AppShell from './components/layout/AppShell';
+import EventsPanel from './components/panels/EventsPanel';
+import WatchZonesPanel from './components/panels/WatchZonesPanel.jsx';
 import {
   fetchAllEvents,
   fetchNearbyEvents,
@@ -12,6 +14,12 @@ import {
   updateWatchZone,
   deleteWatchZone
 } from './services/api';
+import {
+  ExclamationTriangleIcon,
+  MapPinIcon,
+  BellIcon,
+  AdjustmentsHorizontalIcon
+} from '@heroicons/react/24/outline';
 
 export default function App() {
   const [events, setEvents] = useState([]);
@@ -19,6 +27,7 @@ export default function App() {
   const [userLocation, setUserLocation] = useState(null);
   const [searchRadius, setSearchRadius] = useState(1500);
   const [isSearchingNearby, setIsSearchingNearby] = useState(false);
+  const [activePanel, setActivePanel] = useState('events');
 
   const [user, setUser] = useState(null);
   const [watchZones, setWatchZones] = useState([]);
@@ -65,21 +74,6 @@ export default function App() {
     } catch (err) {
       console.error('Failed to load watch zones:', err);
     }
-  };
-
-  const handleCreateWatchZone = async (zoneData) => {
-    await createWatchZone(zoneData);
-    await loadUserWatchZones();
-  };
-
-  const handleUpdateWatchZone = async (id, zoneData) => {
-    await updateWatchZone(id, zoneData);
-    await loadUserWatchZones();
-  };
-
-  const handleDeleteWatchZone = async (id) => {
-    await deleteWatchZone(id);
-    await loadUserWatchZones();
   };
 
   const handleAuthSuccess = (authenticatedUser) => {
@@ -136,35 +130,95 @@ export default function App() {
     );
   };
 
+  const handleCreateWatchZone = async (zoneData) => {
+    await createWatchZone(zoneData);
+    await loadUserWatchZones();
+  };
+
+  const handleUpdateWatchZone = async (id, zoneData) => {
+    await updateWatchZone(id, zoneData);
+    await loadUserWatchZones();
+  };
+
+  const handleDeleteWatchZone = async (id) => {
+    await deleteWatchZone(id);
+    await loadUserWatchZones();
+  };
+
+  const panelConfig = {
+    events: {
+      title: 'Events',
+      icon: ExclamationTriangleIcon,
+      content: (
+        <EventsPanel
+          events={events}
+          selectedEvent={selectedEvent}
+          onSelectEvent={setSelectedEvent}
+          onLocateUser={handleLocateUser}
+          onResetSearch={loadGlobalEvents}
+          isSearchingNearby={isSearchingNearby}
+          searchRadius={searchRadius}
+          setSearchRadius={setSearchRadius}
+        />
+      )
+    },
+    'watch-zones': {
+      title: 'Watch Zones',
+      icon: MapPinIcon,
+      content: (
+        <WatchZonesPanel
+          user={user}
+          watchZones={watchZones}
+          onCreateWatchZone={handleCreateWatchZone}
+          onUpdateWatchZone={handleUpdateWatchZone}
+          onDeleteWatchZone={handleDeleteWatchZone}
+        />
+      )
+    },
+    notifications: {
+      title: 'Notifications',
+      icon: BellIcon,
+      content: (
+        <p className="text-sm text-gray-400">
+          Notifications will be implemented here.
+        </p>
+      )
+    },
+    settings: {
+      title: 'Settings',
+      icon: AdjustmentsHorizontalIcon,
+      content: (
+        <p className="text-sm text-gray-400">
+          Map settings will be implemented here.
+        </p>
+      )
+    }
+  };
+
+  const currentPanel = activePanel ? panelConfig[activePanel] : null;
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-gray-950">
-      <Map
-        events={events}
-        userLocation={userLocation}
-        watchZones={watchZones}
-        searchRadius={searchRadius}
-        selectedEvent={selectedEvent}
-        onSelectEvent={setSelectedEvent}
-      />
-
-      <NavigationOverlay
-        events={events}
-        selectedEvent={selectedEvent}
-        onSelectEvent={setSelectedEvent}
-        onLocateUser={handleLocateUser}
-        onResetSearch={loadGlobalEvents}
-        isSearchingNearby={isSearchingNearby}
-        searchRadius={searchRadius}
-        setSearchRadius={setSearchRadius}
-        unreadNotificationsCount={unreadNotificationsCount}
+      <AppShell
+        activePanel={activePanel}
+        onPanelChange={setActivePanel}
         user={user}
-        watchZones={watchZones}
-        onLogout={handleLogout}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
-        onCreateWatchZone={handleCreateWatchZone}
-        onUpdateWatchZone={handleUpdateWatchZone}
-        onDeleteWatchZone={handleDeleteWatchZone}
-      />
+        onLogout={handleLogout}
+        unreadNotificationsCount={unreadNotificationsCount}
+        panelTitle={currentPanel?.title}
+        panelIcon={currentPanel?.icon}
+        panelContent={currentPanel?.content}
+      >
+        <Map
+          events={events}
+          userLocation={userLocation}
+          watchZones={watchZones}
+          searchRadius={searchRadius}
+          selectedEvent={selectedEvent}
+          onSelectEvent={setSelectedEvent}
+        />
+      </AppShell>
 
       <AuthModal
         isOpen={isAuthModalOpen}
