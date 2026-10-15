@@ -5,6 +5,7 @@ import AppShell from './components/layout/AppShell';
 import EventsPanel from './components/panels/EventsPanel';
 import WatchZonesPanel from './components/panels/WatchZonesPanel.jsx';
 import NotificationsPanel from './components/panels/NotificationsPanel';
+import SettingsPanel from './components/panels/SettingsPanel';
 import {
   fetchAllEvents,
   fetchNearbyEvents,
@@ -28,6 +29,40 @@ import {
   AdjustmentsHorizontalIcon
 } from '@heroicons/react/24/outline';
 
+const MAP_SETTINGS_KEY = 'disaster-map-settings';
+
+const DEFAULT_MAP_SETTINGS = {
+  mapStyle: 'standard',
+  theme: 'dark',
+  showEvents: true,
+  showWatchZones: true,
+  showUserLocation: true,
+  rememberMapView: true
+};
+
+const loadSavedMapSettings = () => {
+  try {
+    const saved = localStorage.getItem(MAP_SETTINGS_KEY);
+
+    if (!saved) return DEFAULT_MAP_SETTINGS;
+
+    const parsed = JSON.parse(saved);
+
+    return {
+      ...DEFAULT_MAP_SETTINGS,
+      ...parsed,
+      mapStyle: ['standard', 'satellite', 'topographic'].includes(parsed.mapStyle)
+        ? parsed.mapStyle
+        : DEFAULT_MAP_SETTINGS.mapStyle,
+      theme: ['light', 'dark'].includes(parsed.theme)
+        ? parsed.theme
+        : DEFAULT_MAP_SETTINGS.theme
+    };
+  } catch {
+    return DEFAULT_MAP_SETTINGS;
+  }
+};
+
 export default function App() {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -35,7 +70,7 @@ export default function App() {
   const [searchRadius, setSearchRadius] = useState(1500);
   const [isSearchingNearby, setIsSearchingNearby] = useState(false);
   const [activePanel, setActivePanel] = useState('events');
-
+  const [mapSettings, setMapSettings] = useState(loadSavedMapSettings);
   const [user, setUser] = useState(null);
   const [watchZones, setWatchZones] = useState([]);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
@@ -58,6 +93,49 @@ export default function App() {
       setNotificationsError('');
     }
   }, [user]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        MAP_SETTINGS_KEY,
+        JSON.stringify(mapSettings)
+      );
+    } catch (error) {
+      console.error('[Map Settings Save Error]:', error);
+    }
+  }, [mapSettings]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = mapSettings.theme;
+  }, [mapSettings.theme]);
+
+  useEffect(() => {
+    if (!mapSettings.showUserLocation && !isSearchingNearby) {
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      console.warn('Geolocation is not supported by this browser.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setUserLocation({
+          lat: coords.latitude,
+          lng: coords.longitude
+        });
+      },
+      (error) => {
+        console.error('Unable to retrieve user location:', error);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000
+      }
+    );
+  }, [mapSettings.showUserLocation, isSearchingNearby]);
 
   const checkAuthSession = async () => {
     const accessToken = localStorage.getItem('accessToken');
@@ -278,6 +356,10 @@ export default function App() {
     await loadNotifications();
   };
 
+  const handleResetMapSettings = () => {
+    setMapSettings({ ...DEFAULT_MAP_SETTINGS });
+  };
+
   const panelConfig = {
     events: {
       title: 'Events',
@@ -332,9 +414,12 @@ export default function App() {
       title: 'Settings',
       icon: AdjustmentsHorizontalIcon,
       content: (
-        <p className="text-sm text-gray-400">
-          Map settings will be implemented here.
-        </p>
+        <SettingsPanel
+          settings={mapSettings}
+          onChange={setMapSettings}
+          onReset={handleResetMapSettings}
+          isAuthenticated={Boolean(user)}
+        />
       )
     }
   };
@@ -360,7 +445,9 @@ export default function App() {
           watchZones={watchZones}
           searchRadius={searchRadius}
           selectedEvent={selectedEvent}
+          isSearchingNearby={isSearchingNearby}
           onSelectEvent={setSelectedEvent}
+          mapSettings={mapSettings}
         />
       </AppShell>
 
