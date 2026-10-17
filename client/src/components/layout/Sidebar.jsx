@@ -5,14 +5,16 @@ import {
   MapPinIcon,
   BellIcon,
   AdjustmentsHorizontalIcon,
-  XMarkIcon
+  XMarkIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
 
 const navigationItems = [
   { id: 'events', label: 'Events', icon: ExclamationTriangleIcon },
   { id: 'watch-zones', label: 'Watch Zones', icon: MapPinIcon },
   { id: 'notifications', label: 'Notifications', icon: BellIcon },
-  { id: 'settings', label: 'Settings', icon: AdjustmentsHorizontalIcon }
+  { id: 'settings', label: 'Settings', icon: AdjustmentsHorizontalIcon },
+  { id: 'statistics', label: 'Statistics & History', icon: ChartBarIcon }
 ];
 
 function SidebarButton({

@@ -121,3 +121,30 @@ export const setWatchZoneNotifications = async (zoneId, isMuted) => {
 
   return response.data;
 };
+
+export const fetchHistoricalEvents = async ({
+                                              start,
+                                              end,
+                                              category,
+                                              status = 'all',
+                                              limit = 10000
+                                            }) => {
+  const params = {
+    start,
+    end,
+    status,
+    limit
+  };
+
+  if (category) {
+    params.category = category;
+  }
+
+  const response = await api.get('/events/historical', { params });
+  return response.data;
+};
+
+export const fetchHistoricalCategories = async () => {
+  const response = await api.get('/events/historical/categories');
+  return response.data;
+};

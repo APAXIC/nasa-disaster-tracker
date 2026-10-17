@@ -6,6 +6,7 @@ import EventsPanel from './components/panels/EventsPanel';
 import WatchZonesPanel from './components/panels/WatchZonesPanel.jsx';
 import NotificationsPanel from './components/panels/NotificationsPanel';
 import SettingsPanel from './components/panels/SettingsPanel';
+import StatisticsPanel from './components/panels/StatisticsPanel';
 import {
   fetchAllEvents,
   fetchNearbyEvents,
@@ -26,7 +27,8 @@ import {
   ExclamationTriangleIcon,
   MapPinIcon,
   BellIcon,
-  AdjustmentsHorizontalIcon
+  AdjustmentsHorizontalIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
 
 const MAP_SETTINGS_KEY = 'disaster-map-settings';
@@ -409,6 +411,11 @@ export default function App() {
           onViewEvent={handleViewNotificationEvent}
         />
       )
+    },
+    statistics: {
+      title: 'Statistics & History',
+      icon: ChartBarIcon,
+      content: <StatisticsPanel userLocation={userLocation} />
     },
     settings: {
       title: 'Settings',
