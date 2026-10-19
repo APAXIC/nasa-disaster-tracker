@@ -80,6 +80,7 @@ export default function App() {
   const [notifications, setNotifications] = useState([]);
   const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState('');
+  const [displayEvents, setDisplayEvents] = useState([]);
 
   useEffect(() => {
     loadGlobalEvents();
@@ -138,6 +139,10 @@ export default function App() {
       }
     );
   }, [mapSettings.showUserLocation, isSearchingNearby]);
+
+  useEffect(() => {
+    setDisplayEvents(events);
+  }, [events]);
 
   const checkAuthSession = async () => {
     const accessToken = localStorage.getItem('accessToken');
@@ -376,6 +381,8 @@ export default function App() {
           isSearchingNearby={isSearchingNearby}
           searchRadius={searchRadius}
           setSearchRadius={setSearchRadius}
+          userLocation={userLocation}
+          onDisplayEventsChange={setDisplayEvents}
         />
       )
     },
@@ -447,7 +454,7 @@ export default function App() {
         panelContent={currentPanel?.content}
       >
         <Map
-          events={events}
+          events={displayEvents}
           userLocation={userLocation}
           watchZones={watchZones}
           searchRadius={searchRadius}

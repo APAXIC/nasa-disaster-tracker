@@ -148,3 +148,4 @@ export const fetchHistoricalCategories = async () => {
   const response = await api.get('/events/historical/categories');
   return response.data;
 };
+
