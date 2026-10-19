@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Sidebar from './Sidebar';
 import FloatingPanel from './FloatingPanel';
 
@@ -34,7 +35,15 @@ export default function AppShell({
           icon={panelIcon}
           onClose={() => onPanelChange(null)}
         >
-          {panelContent}
+          <Suspense
+            fallback={
+              <div className="flex min-h-32 items-center justify-center text-sm text-gray-400">
+                Loading panel...
+              </div>
+            }
+          >
+            {panelContent}
+          </Suspense>
         </FloatingPanel>
       )}
     </main>

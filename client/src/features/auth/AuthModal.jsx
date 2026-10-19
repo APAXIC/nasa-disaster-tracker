@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { XMarkIcon, LockClosedIcon, EnvelopeIcon, UserIcon } from '@heroicons/react/24/outline';
-import { loginUser, registerUser } from '../services/api';
+import { loginUser, registerUser } from '../../services/authApi.js';
 
 export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   const [isLogin, setIsLogin] = useState(true);

@@ -1,150 +1,21 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  MagnifyingGlassIcon,
   MapPinIcon,
   ArrowPathIcon
 } from '@heroicons/react/24/outline';
-import { fetchHistoricalCategories } from '../../services/api';
+import { fetchHistoricalCategories } from '../../services/eventsApi.js';
+import {
+  getDistance,
+  getEventCategories,
+  getEventDate,
+  getMagnitudeInfo
+} from './eventUtils';
+import EventListItem from './EventListItem.jsx';
+import EventSearchInput from './EventSearchInput.jsx';
 
 const DEFAULT_DISPLAY_LIMIT = '';
 const MAX_DISPLAY_LIMIT = 1000000;
-
-function getEventCategories(event) {
-  return (event.categories || []).map((category) => ({
-    id: String(category.id ?? category.title ?? category.name ?? ''),
-    title: category.title ?? category.name ?? category.id ?? 'Unknown'
-  }));
-}
-
-function getEventDate(event) {
-  const dates = (event.geometry || [])
-    .map((point) => Date.parse(point.date || ''))
-    .filter(Number.isFinite);
-
-  if (dates.length > 0) {
-    return Math.max(...dates);
-  }
-
-  const fallbackDate = event.closed_at ?? event.closed ?? event.date;
-
-  if (!fallbackDate) return null;
-
-  const timestamp = Date.parse(fallbackDate);
-  return Number.isFinite(timestamp) ? timestamp : null;
-}
-
-function getMagnitudeInfo(event) {
-  const hasEventMagnitude =
-    event.magnitudeValue !== null &&
-    event.magnitudeValue !== undefined &&
-    event.magnitudeValue !== '' &&
-    Number.isFinite(Number(event.magnitudeValue));
-
-  if (hasEventMagnitude) {
-    return {
-      value: Number(event.magnitudeValue),
-      unit: event.magnitudeUnit || ''
-    };
-  }
-
-  const magnitudes = (event.geometry || [])
-    .filter(
-      (point) =>
-        point.magnitudeValue !== null &&
-        point.magnitudeValue !== undefined &&
-        point.magnitudeValue !== '' &&
-        Number.isFinite(Number(point.magnitudeValue))
-    )
-    .map((point) => ({
-      value: Number(point.magnitudeValue),
-      unit: point.magnitudeUnit || '',
-      date: Date.parse(point.date || '')
-    }))
-    .sort((a, b) => {
-      const dateA = Number.isFinite(a.date) ? a.date : -Infinity;
-      const dateB = Number.isFinite(b.date) ? b.date : -Infinity;
-      return dateB - dateA;
-    });
-
-  return magnitudes[0] || null;
-}
-
-function getDistance(event, userLocation) {
-  if (
-    event.distance_km !== null &&
-    event.distance_km !== undefined &&
-    event.distance_km !== '' &&
-    Number.isFinite(Number(event.distance_km))
-  ) {
-    return Number(event.distance_km);
-  }
-
-  if (
-    !userLocation ||
-    !Number.isFinite(Number(userLocation.lat)) ||
-    !Number.isFinite(Number(userLocation.lng))
-  ) {
-    return null;
-  }
-
-  const coordinates = getEventCoordinates(event);
-  if (!coordinates) return null;
-
-  const toRadians = (degrees) => (degrees * Math.PI) / 180;
-  const earthRadiusKm = 6371;
-
-  const lat1 = toRadians(Number(userLocation.lat));
-  const lat2 = toRadians(coordinates.lat);
-  const deltaLat = toRadians(coordinates.lat - Number(userLocation.lat));
-  const deltaLng = toRadians(coordinates.lng - Number(userLocation.lng));
-
-  const a =
-    Math.sin(deltaLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2;
-
-  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function getEventCoordinates(event) {
-  const latitude = Number(event.latitude);
-  const longitude = Number(event.longitude);
-
-  if (
-    event.latitude != null &&
-    event.longitude != null &&
-    Number.isFinite(latitude) &&
-    Number.isFinite(longitude) &&
-    latitude >= -90 &&
-    latitude <= 90 &&
-    longitude >= -180 &&
-    longitude <= 180
-  ) {
-    return { lat: latitude, lng: longitude };
-  }
-
-  const geometry = event.geometry || [];
-
-  for (let i = geometry.length - 1; i >= 0; i -= 1) {
-    const coordinates =
-      geometry[i]?.coordinates ??
-      geometry[i]?.geometry?.coordinates;
-
-    if (
-      Array.isArray(coordinates) &&
-      coordinates.length >= 2 &&
-      Number.isFinite(Number(coordinates[0])) &&
-      Number.isFinite(Number(coordinates[1]))
-    ) {
-      return {
-        lat: Number(coordinates[1]),
-        lng: Number(coordinates[0])
-      };
-    }
-  }
-
-  return null;
-}
 
 function compareMissingLast(a, b, direction = 1) {
   if (a === null && b === null) return 0;
@@ -155,69 +26,63 @@ function compareMissingLast(a, b, direction = 1) {
 }
 
 function sortEvents(events, sortBy, userLocation) {
-  return [...events].sort((a, b) => {
-    if (sortBy === 'newest' || sortBy === 'oldest') {
-      const dateA = getEventDate(a);
-      const dateB = getEventDate(b);
+  if (sortBy !== 'newest' && sortBy !== 'oldest' &&
+      sortBy !== 'nearest' && sortBy !== 'farthest' &&
+      sortBy !== 'magnitude-asc' && sortBy !== 'magnitude-desc') {
+    return events;
+  }
 
-      const result = compareMissingLast(
-        dateA,
-        dateB,
+  // Calculate expensive sort keys once per event instead of inside the comparator.
+  const decorated = events.map((event) => ({
+    event,
+    date: sortBy === 'newest' || sortBy === 'oldest'
+      ? getEventDate(event)
+      : null,
+    distance: sortBy === 'nearest' || sortBy === 'farthest'
+      ? getDistance(event, userLocation)
+      : null,
+    magnitude: sortBy === 'magnitude-asc' || sortBy === 'magnitude-desc'
+      ? getMagnitudeInfo(event)
+      : null
+  }));
+
+  decorated.sort((a, b) => {
+    let result = 0;
+
+    if (sortBy === 'newest' || sortBy === 'oldest') {
+      result = compareMissingLast(
+        a.date,
+        b.date,
         sortBy === 'newest' ? -1 : 1
       );
-
-      return result || String(a.title ?? '').localeCompare(String(b.title ?? ''));
-    }
-
-    if (sortBy === 'nearest' || sortBy === 'farthest') {
-      const result = compareMissingLast(
-        getDistance(a, userLocation),
-        getDistance(b, userLocation),
+    } else if (sortBy === 'nearest' || sortBy === 'farthest') {
+      result = compareMissingLast(
+        a.distance,
+        b.distance,
         sortBy === 'nearest' ? 1 : -1
       );
+    } else {
+      if (!a.magnitude && !b.magnitude) {
+        result = 0;
+      } else if (!a.magnitude) {
+        result = 1;
+      } else if (!b.magnitude) {
+        result = -1;
+      } else {
+        const unitA = a.magnitude.unit || '';
+        const unitB = b.magnitude.unit || '';
 
-      return result || String(a.title ?? '').localeCompare(String(b.title ?? ''));
+        result = unitA !== unitB
+          ? unitA.localeCompare(unitB)
+          : (a.magnitude.value - b.magnitude.value) *
+            (sortBy === 'magnitude-asc' ? 1 : -1);
+      }
     }
 
-    if (sortBy === 'magnitude-asc' || sortBy === 'magnitude-desc') {
-      const magnitudeA = getMagnitudeInfo(a);
-      const magnitudeB = getMagnitudeInfo(b);
-
-      if (!magnitudeA && !magnitudeB) {
-        return String(a.title ?? '').localeCompare(String(b.title ?? ''));
-      }
-
-      if (!magnitudeA) return 1;
-      if (!magnitudeB) return -1;
-
-      const unitA = magnitudeA.unit || '';
-      const unitB = magnitudeB.unit || '';
-
-      if (unitA !== unitB) {
-        return unitA.localeCompare(unitB);
-      }
-
-      const direction = sortBy === 'magnitude-asc' ? 1 : -1;
-      return (
-        (magnitudeA.value - magnitudeB.value) * direction ||
-        String(a.title ?? '').localeCompare(String(b.title ?? ''))
-      );
-    }
-
-    return 0;
+    return result || String(a.event.title ?? '').localeCompare(String(b.event.title ?? ''));
   });
-}
 
-function formatEventDate(timestamp) {
-  if (timestamp === null) return 'Date unavailable';
-
-  return new Date(timestamp).toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  return decorated.map(({ event }) => event);
 }
 
 export default function EventsPanel({
@@ -353,18 +218,7 @@ export default function EventsPanel({
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search events..."
-          aria-label="Search events"
-          className="w-full rounded-xl border border-gray-700 bg-gray-800/80 py-3 pl-9 pr-3 text-sm text-white outline-none transition placeholder:text-gray-500 focus:border-orange-500"
-        />
-      </div>
+      <EventSearchInput query={query} onQueryChange={setQuery} />
 
       <button
         type="button"
@@ -529,73 +383,16 @@ export default function EventsPanel({
       </div>
 
       <div className="space-y-2">
-        {filteredEvents.map((event) => {
-          const isSelected =
-            String(selectedEvent?.id) === String(event.id);
-
-          const magnitude = getMagnitudeInfo(event);
-          const distance = getDistance(event, userLocation);
-          const eventDate = getEventDate(event);
-
-          const categoryTitles = getEventCategories(event)
-            .map((category) => category.title)
-            .join(', ');
-
-          return (
-            <button
-              key={event.id}
-              ref={(element) => {
-                const id = String(event.id);
-
-                if (element) {
-                  cardRefs.current.set(id, element);
-                } else {
-                  cardRefs.current.delete(id);
-                }
-              }}
-              type="button"
-              onClick={() => onSelectEvent(event)}
-              aria-pressed={isSelected}
-              className={`w-full rounded-xl border p-3 text-left transition ${
-                isSelected
-                  ? 'border-orange-500 bg-orange-500/10'
-                  : 'border-gray-800 bg-gray-900/60 hover:border-gray-700 hover:bg-gray-800/70'
-              }`}
-            >
-              <span className="block text-sm font-medium text-gray-100">
-                {event.title}
-              </span>
-
-              {categoryTitles && (
-                <span className="mt-1 block text-xs text-gray-400">
-                  {categoryTitles}
-                </span>
-              )}
-
-              <span className="mt-1 block text-xs text-gray-400">
-                Date: {formatEventDate(eventDate)}
-              </span>
-
-              <span className="mt-1 block text-xs text-orange-300">
-                {magnitude
-                  ? `Magnitude: ${magnitude.value}${magnitude.unit ? ` ${magnitude.unit}` : ''}`
-                  : 'Magnitude: unavailable'}
-              </span>
-
-              {distance !== null ? (
-                <span className="mt-1 block text-xs text-blue-400">
-                  {distance < 10
-                    ? `${distance.toFixed(1)} km from you`
-                    : `${Math.round(distance)} km from you`}
-                </span>
-              ) : (
-                <span className="mt-1 block text-xs text-gray-500">
-                  Distance unavailable
-                </span>
-              )}
-            </button>
-          );
-        })}
+        {filteredEvents.map((event) => (
+          <EventListItem
+            key={event.id}
+            event={event}
+            isSelected={String(selectedEvent?.id) === String(event.id)}
+            userLocation={userLocation}
+            cardRefs={cardRefs}
+            onSelectEvent={onSelectEvent}
+          />
+        ))}
 
         {filteredEvents.length === 0 && (
           <p className="py-8 text-center text-sm text-gray-500">
