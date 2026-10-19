@@ -1,11 +1,12 @@
-import { useEffect, useRef } from 'react';
+import {useEffect, useRef} from 'react';
 import {
   MapContainer,
   TileLayer,
   Marker,
   Popup,
   Circle,
-  useMap
+  useMap,
+  useMapEvents
 } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
@@ -143,7 +144,22 @@ function getInitialMapView(rememberMapView) {
   }
 }
 
-function MapViewController({ rememberMapView }) {
+function MapClickHandler({enabled, onLocationSelect}) {
+  useMapEvents({
+    click(event) {
+      if (!enabled) return;
+
+      onLocationSelect?.({
+        lat: event.latlng.lat,
+        lng: event.latlng.lng
+      });
+    }
+  });
+
+  return null;
+}
+
+function MapViewController({rememberMapView}) {
   const map = useMap();
 
   useEffect(() => {
@@ -187,10 +203,10 @@ function MapViewController({ rememberMapView }) {
 }
 
 function SelectedEventController({
-  selectedEvent,
-  markerRefs,
-  clusterRef
-}) {
+                                   selectedEvent,
+                                   markerRefs,
+                                   clusterRef
+                                 }) {
   const map = useMap();
 
   useEffect(() => {
@@ -252,7 +268,7 @@ function getValidCoordinates(latitude, longitude) {
   return [lat, lng];
 }
 
-function MapScaleControl({ theme }) {
+function MapScaleControl({theme}) {
   const map = useMap();
 
   useEffect(() => {
@@ -301,15 +317,18 @@ function MapScaleControl({ theme }) {
 }
 
 export default function Map({
-  events = [],
-  userLocation,
-  watchZones = [],
-  searchRadius,
-  isSearchingNearby = false,
-  selectedEvent,
-  onSelectEvent,
-  mapSettings = {},
-}) {
+                              events = [],
+                              userLocation,
+                              watchZones = [],
+                              searchRadius,
+                              isSearchingNearby = false,
+                              selectedEvent,
+                              onSelectEvent,
+                              mapSettings = {},
+                              isPickingWatchZoneLocation = false,
+                              onWatchZoneLocationSelect,
+                              watchZonePreview
+                            }) {
   const settings = {
     mapStyle: 'standard',
     theme: 'dark',
@@ -350,7 +369,14 @@ export default function Map({
         scrollWheelZoom
         worldCopyJump={false}
         className="z-0 h-full w-full"
+        style={{
+          cursor: isPickingWatchZoneLocation ? 'crosshair' : undefined
+        }}
       >
+        <MapClickHandler
+          enabled={isPickingWatchZoneLocation}
+          onLocationSelect={onWatchZoneLocationSelect}
+        />
         <TileLayer
           key={`${mapStyle}-${settings.theme}`}
           attribution={layerConfig.attribution}
@@ -358,7 +384,45 @@ export default function Map({
           noWrap={false}
         />
 
-        <MapScaleControl theme={settings.theme} />
+        <MapScaleControl theme={settings.theme}/>
+
+        {watchZonePreview && (() => {
+          const center = getValidCoordinates(
+            watchZonePreview.latitude,
+            watchZonePreview.longitude
+          );
+
+          const radiusKm = Number(watchZonePreview.radiusKm);
+
+          if (
+            !center ||
+            !Number.isFinite(radiusKm) ||
+            radiusKm <= 0
+          ) {
+            return null;
+          }
+
+          return (
+            <Circle
+              center={center}
+              radius={radiusKm * 1000}
+              pathOptions={{
+                color: '#f97316',
+                fillColor: '#f97316',
+                fillOpacity: 0.18,
+                weight: 3,
+                dashArray: '8 6'
+              }}
+            >
+              <Popup>
+                <div className="text-sm text-gray-900">
+                  <p className="font-semibold">Watch Zone Preview</p>
+                  <p>{radiusKm} km radius</p>
+                </div>
+              </Popup>
+            </Circle>
+          );
+        })()}
 
         <MapViewController
           rememberMapView={settings.rememberMapView}

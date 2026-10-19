@@ -81,6 +81,9 @@ export default function App() {
   const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState('');
   const [displayEvents, setDisplayEvents] = useState([]);
+  const [isPickingWatchZoneLocation, setIsPickingWatchZoneLocation] = useState(false);
+  const [pickedWatchZoneLocation, setPickedWatchZoneLocation] = useState(null);
+  const [watchZonePreview, setWatchZonePreview] = useState(null);
 
   useEffect(() => {
     loadGlobalEvents();
@@ -174,7 +177,6 @@ export default function App() {
   const loadUserWatchZones = async () => {
     try {
       const zones = await fetchWatchZones();
-      console.log('[Watch Zones Loaded]:', zones);
       setWatchZones(zones.data || zones || []);
     } catch (err) {
       console.error('Failed to load watch zones:', err);
@@ -345,6 +347,22 @@ export default function App() {
     );
   };
 
+  const handleStartPickingWatchZoneLocation = () => {
+    setPickedWatchZoneLocation(null);
+    setWatchZonePreview(null);
+    setIsPickingWatchZoneLocation(true);
+  };
+
+  const handleWatchZoneLocationSelect = (location) => {
+    setPickedWatchZoneLocation(location);
+    setIsPickingWatchZoneLocation(false);
+  };
+
+  const handleCancelPickingWatchZoneLocation = () => {
+    setIsPickingWatchZoneLocation(false);
+    setPickedWatchZoneLocation(null);
+  };
+
   const handleCreateWatchZone = async (zoneData) => {
     await createWatchZone(zoneData);
     await loadUserWatchZones();
@@ -397,6 +415,11 @@ export default function App() {
           onUpdateWatchZone={handleUpdateWatchZone}
           onDeleteWatchZone={handleDeleteWatchZone}
           onToggleWatchZoneNotifications={handleToggleWatchZoneNotifications}
+          pickedLocation={pickedWatchZoneLocation}
+          isPickingLocation={isPickingWatchZoneLocation}
+          onStartPickingLocation={handleStartPickingWatchZoneLocation}
+          onCancelPickingLocation={handleCancelPickingWatchZoneLocation}
+          onPreviewChange={setWatchZonePreview}
         />
       )
     },
@@ -462,6 +485,9 @@ export default function App() {
           isSearchingNearby={isSearchingNearby}
           onSelectEvent={setSelectedEvent}
           mapSettings={mapSettings}
+          isPickingWatchZoneLocation={isPickingWatchZoneLocation}
+          onWatchZoneLocationSelect={handleWatchZoneLocationSelect}
+          watchZonePreview={watchZonePreview}
         />
       </AppShell>
 

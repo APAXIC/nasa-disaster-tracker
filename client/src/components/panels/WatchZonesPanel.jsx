@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   MapPinIcon,
   PlusIcon,
@@ -25,7 +25,12 @@ export default function WatchZonesPanel({
                                           onCreateWatchZone,
                                           onUpdateWatchZone,
                                           onDeleteWatchZone,
-                                          onToggleWatchZoneNotifications
+                                          onToggleWatchZoneNotifications,
+                                          pickedLocation,
+                                          isPickingLocation,
+                                          onStartPickingLocation,
+                                          onCancelPickingLocation,
+                                          onPreviewChange
                                         }) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingZone, setEditingZone] = useState(null);
@@ -35,8 +40,79 @@ export default function WatchZonesPanel({
   const [deletingZoneId, setDeletingZoneId] = useState(null);
   const [togglingZoneId, setTogglingZoneId] = useState(null);
 
+  useEffect(() => {
+    if (!pickedLocation || !isFormOpen || editingZone) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      latitude: String(pickedLocation.lat),
+      longitude: String(pickedLocation.lng)
+    }));
+
+    setFormError('');
+  }, [pickedLocation, isFormOpen, editingZone]);
+
+  useEffect(() => {
+    if (!pickedLocation || !isFormOpen || editingZone) {
+      return;
+    }
+
+    const nextForm = {
+      ...form,
+      latitude: String(pickedLocation.lat),
+      longitude: String(pickedLocation.lng)
+    };
+
+    setForm(nextForm);
+    setFormError('');
+
+    const radiusKm = Number(nextForm.radiusKm);
+
+    onPreviewChange?.(
+      Number.isFinite(radiusKm) && radiusKm > 0
+        ? {
+          latitude: pickedLocation.lat,
+          longitude: pickedLocation.lng,
+          radiusKm
+        }
+        : null
+    );
+  }, [pickedLocation]);
+
   const updateField = (field, value) => {
-    setForm((current) => ({ ...current, [field]: value }));
+    const nextForm = {
+      ...form,
+      [field]: value
+    };
+
+    setForm(nextForm);
+
+    const latitude = Number(nextForm.latitude);
+    const longitude = Number(nextForm.longitude);
+    const radiusKm = Number(nextForm.radiusKm);
+
+    const hasValidCoordinates =
+      nextForm.latitude.trim() !== '' &&
+      nextForm.longitude.trim() !== '' &&
+      Number.isFinite(latitude) &&
+      latitude >= -90 &&
+      latitude <= 90 &&
+      Number.isFinite(longitude) &&
+      longitude >= -180 &&
+      longitude <= 180;
+
+    const hasValidRadius =
+      nextForm.radiusKm.trim() !== '' &&
+      Number.isFinite(radiusKm) &&
+      radiusKm > 0;
+
+    onPreviewChange?.(
+      hasValidCoordinates && hasValidRadius
+        ? { latitude, longitude, radiusKm }
+        : null
+    );
   };
 
   const openCreateForm = () => {
@@ -44,6 +120,8 @@ export default function WatchZonesPanel({
     setForm(EMPTY_FORM);
     setFormError('');
     setIsFormOpen(true);
+    onPreviewChange?.(null);
+    onCancelPickingLocation?.();
   };
 
   const openEditForm = (zone) => {
@@ -65,6 +143,9 @@ export default function WatchZonesPanel({
     setEditingZone(null);
     setForm(EMPTY_FORM);
     setFormError('');
+
+    onPreviewChange?.(null);
+    onCancelPickingLocation?.();
   };
 
   const handleSubmit = async (event) => {
@@ -125,6 +206,9 @@ export default function WatchZonesPanel({
       setEditingZone(null);
       setForm(EMPTY_FORM);
       setFormError('');
+
+      onPreviewChange?.(null);
+      onCancelPickingLocation?.();
     } catch (error) {
       setFormError(
         error.response?.data?.error ||
@@ -323,6 +407,24 @@ export default function WatchZonesPanel({
               />
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              onStartPickingLocation?.();
+            }}
+            disabled={isSubmitting}
+            className="w-full rounded-lg border border-orange-500/50 bg-orange-500/10 px-3 py-2.5 text-sm font-medium text-orange-300 transition hover:bg-orange-500/20 disabled:opacity-50"
+          >
+            <MapPinIcon className="mr-2 inline h-4 w-4" />
+            {isPickingLocation ? 'Click on the map...' : 'Pick location on map'}
+          </button>
+
+          {isPickingLocation && (
+            <p className="text-xs leading-5 text-orange-300">
+              Click anywhere on the map to select the centre of this watch zone.
+            </p>
+          )}
 
           <div>
             <label
