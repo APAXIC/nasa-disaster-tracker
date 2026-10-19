@@ -16,6 +16,21 @@ import EventSearchInput from './EventSearchInput.jsx';
 
 const DEFAULT_DISPLAY_LIMIT = '';
 const MAX_DISPLAY_LIMIT = 1000000;
+const EVENT_FILTERS_KEY = 'disaster-map-event-filters';
+
+function loadEventFilters() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(EVENT_FILTERS_KEY) || '{}');
+    return {
+      query: typeof saved.query === 'string' ? saved.query : '',
+      selectedCategory: typeof saved.selectedCategory === 'string' ? saved.selectedCategory : '',
+      sortBy: ['newest', 'oldest', 'nearest', 'farthest', 'magnitude-asc', 'magnitude-desc'].includes(saved.sortBy) ? saved.sortBy : 'newest',
+      displayLimitInput: typeof saved.displayLimitInput === 'string' ? saved.displayLimitInput : DEFAULT_DISPLAY_LIMIT
+    };
+  } catch {
+    return { query: '', selectedCategory: '', sortBy: 'newest', displayLimitInput: DEFAULT_DISPLAY_LIMIT };
+  }
+}
 
 function compareMissingLast(a, b, direction = 1) {
   if (a === null && b === null) return 0;
@@ -32,7 +47,6 @@ function sortEvents(events, sortBy, userLocation) {
     return events;
   }
 
-  // Calculate expensive sort keys once per event instead of inside the comparator.
   const decorated = events.map((event) => ({
     event,
     date: sortBy === 'newest' || sortBy === 'oldest'
@@ -97,11 +111,24 @@ export default function EventsPanel({
                                       onDisplayEventsChange,
                                       userLocation
                                     }) {
-  const [query, setQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [sortBy, setSortBy] = useState('newest');
-  const [displayLimitInput, setDisplayLimitInput] =
-    useState(DEFAULT_DISPLAY_LIMIT);
+  const [initialFilters] = useState(loadEventFilters);
+  const [query, setQuery] = useState(initialFilters.query);
+  const [selectedCategory, setSelectedCategory] = useState(initialFilters.selectedCategory);
+  const [sortBy, setSortBy] = useState(initialFilters.sortBy);
+  const [displayLimitInput, setDisplayLimitInput] = useState(initialFilters.displayLimitInput);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(EVENT_FILTERS_KEY, JSON.stringify({
+        query,
+        selectedCategory,
+        sortBy,
+        displayLimitInput
+      }));
+    } catch (error) {
+      console.error('Failed to save event filters:', error);
+    }
+  }, [query, selectedCategory, sortBy, displayLimitInput]);
 
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
@@ -220,16 +247,16 @@ export default function EventsPanel({
     <div className="space-y-4">
       <EventSearchInput query={query} onQueryChange={setQuery} />
 
-      <button
-        type="button"
-        onClick={onLocateUser}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500"
-      >
-        <MapPinIcon className="h-4 w-4" />
-        Find Nearby Events
-      </button>
-
-      {isSearchingNearby && (
+      {!isSearchingNearby ? (
+        <button
+          type="button"
+          onClick={onLocateUser}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500"
+        >
+          <MapPinIcon className="h-4 w-4" />
+          Find Nearby Events
+        </button>
+      ) : (
         <div className="space-y-3 rounded-xl border border-gray-800 bg-gray-800/50 p-3">
           <div className="flex items-center justify-between text-sm">
             <label htmlFor="search-radius" className="text-gray-300">
@@ -247,19 +274,21 @@ export default function EventsPanel({
             max="5000"
             step="100"
             value={searchRadius}
-            onChange={(event) =>
-              setSearchRadius(Number(event.target.value))
-            }
+            onChange={(event) => setSearchRadius(Number(event.target.value))}
             className="w-full accent-blue-500"
           />
+
+          <p className="text-xs text-gray-400">
+            Results update automatically as you adjust the radius.
+          </p>
 
           <button
             type="button"
             onClick={onResetSearch}
-            className="flex items-center gap-2 text-xs text-gray-400 transition hover:text-white"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-500"
           >
-            <ArrowPathIcon className="h-3.5 w-3.5" />
-            Show all global events
+            <ArrowPathIcon className="h-4 w-4" />
+            Return to Global Events
           </button>
         </div>
       )}

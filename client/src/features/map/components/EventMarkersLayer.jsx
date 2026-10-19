@@ -3,13 +3,21 @@ import { Marker, Popup, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import { defaultIcon, selectedEventIcon } from '../mapConfig.js';
 import SelectedEventController from './SelectedEventController.jsx';
+import {
+  formatEventDate,
+  getDistance,
+  getEventCategories,
+  getEventDate,
+  getMagnitudeInfo
+} from '../../events/eventUtils.js';
 
 function EventMarkersLayer({
   events,
   selectedEvent,
   onSelectEvent,
   markerRefs,
-  clusterRef
+  clusterRef,
+  userLocation
 }) {
   const map = useMap();
   const [viewportVersion, setViewportVersion] = useState(0);
@@ -104,23 +112,51 @@ function EventMarkersLayer({
               }}
             >
               <Popup>
-                <div className="max-w-xs p-1">
-                  <h3 className="text-sm font-bold text-gray-900">
-                    {event.title}
-                  </h3>
-
-                  {event.distance_km != null && (
-                    <p className="mt-1 text-xs font-medium text-blue-600">
-                      {Math.round(event.distance_km)} km away
-                    </p>
-                  )}
-                </div>
+                <EventPopupDetails event={event} userLocation={userLocation} />
               </Popup>
             </Marker>
           );
         })}
       </MarkerClusterGroup>
     </>
+  );
+}
+
+function EventPopupDetails({ event, userLocation }) {
+  const categories = getEventCategories(event)
+    .map((category) => category.title)
+    .join(', ');
+  const magnitude = getMagnitudeInfo(event);
+  const distance = getDistance(event, userLocation);
+
+  return (
+    <div className="max-w-xs space-y-1 p-1 text-gray-900">
+      <h3 className="text-sm font-bold">{event.title}</h3>
+
+      {categories && (
+        <p className="text-xs text-gray-600">{categories}</p>
+      )}
+
+      <p className="text-xs text-gray-600">
+        Date: {formatEventDate(getEventDate(event))}
+      </p>
+
+      <p className="text-xs font-medium text-orange-700">
+        {magnitude
+          ? `Magnitude: ${magnitude.value}${magnitude.unit ? ` ${magnitude.unit}` : ''}`
+          : 'Magnitude: unavailable'}
+      </p>
+
+      {distance !== null ? (
+        <p className="text-xs font-medium text-blue-700">
+          {distance < 10
+            ? `${distance.toFixed(1)} km from you`
+            : `${Math.round(distance)} km from you`}
+        </p>
+      ) : (
+        <p className="text-xs text-gray-500">Distance unavailable</p>
+      )}
+    </div>
   );
 }
 

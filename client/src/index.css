@@ -80,7 +80,6 @@ body, html, #root {
   color: #111827;
 }
 
-/* Leaflet scale control */
 .leaflet-control-scale {
   margin-bottom: 18px !important;
   margin-right: 18px !important;
@@ -106,7 +105,6 @@ html[data-theme='light'] .leaflet-control-scale-line {
   color: #111827 !important;
 }
 
-/* Light theme: panel and sidebar backgrounds */
 html[data-theme='light'] [class*='bg-gray-950'],
 html[data-theme='light'] [class*='bg-gray-900'] {
   background-color: #ffffff !important;
@@ -116,7 +114,6 @@ html[data-theme='light'] [class*='bg-gray-800'] {
   background-color: #f3f4f6 !important;
 }
 
-/* Light theme: secondary text */
 html[data-theme='light'] [class*='text-gray-100'],
 html[data-theme='light'] [class*='text-gray-200'],
 html[data-theme='light'] [class*='text-gray-300'] {
@@ -136,7 +133,6 @@ html[data-theme='light'] [class*='border-gray-900'] {
   border-color: #d1d5db !important;
 }
 
-/* Light theme: form controls */
 html[data-theme='light'] input:not([type='checkbox']):not([type='range']),
 html[data-theme='light'] textarea,
 html[data-theme='light'] select {

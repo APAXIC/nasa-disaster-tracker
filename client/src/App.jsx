@@ -14,6 +14,7 @@ export default function App() {
     isAuthModalOpen,
     setIsAuthModalOpen,
     displayEvents,
+    isEventsLoading,
     selectedEvent,
     setSelectedEvent,
     userLocation,
@@ -58,6 +59,19 @@ export default function App() {
           watchZonePreview={watchZonePreview}
         />
       </AppShell>
+
+      {isEventsLoading && (
+        <div
+          className="fixed inset-0 z-[2000] flex items-center justify-center bg-gray-950/55 backdrop-blur-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex items-center gap-3 rounded-xl border border-gray-700 bg-gray-900/95 px-5 py-4 text-sm font-medium text-white shadow-2xl">
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-gray-600 border-t-orange-400" />
+            Loading disaster events...
+          </div>
+        </div>
+      )}
 
       <AuthModal
         isOpen={isAuthModalOpen}

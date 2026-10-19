@@ -150,7 +150,6 @@ function sortHistoricalEvents(events, sortBy, userLocation) {
     return events;
   }
 
-  // Cache each event's sort value once; geometry parsing can be expensive.
   const decorated = events.map((event) => ({
     event,
     timestamp: sortBy === 'oldest' || sortBy === 'newest'
@@ -187,7 +186,6 @@ function sortHistoricalEvents(events, sortBy, userLocation) {
     if (!a.magnitude) return 1;
     if (!b.magnitude) return -1;
 
-    // Different units are grouped, not compared numerically.
     const unitA = a.magnitude.unit.toLowerCase();
     const unitB = b.magnitude.unit.toLowerCase();
 
@@ -269,7 +267,6 @@ export default function StatisticsPanel({ userLocation }) {
       return;
     }
 
-    // Empty fields fall back to their default limits.
     const parsedAnalysisLimit = analysisLimit.trim() === ''
       ? DEFAULT_ANALYSIS_LIMIT
       : Number(analysisLimit);

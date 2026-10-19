@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   fetchCurrentUser,
   logoutUser
@@ -27,6 +27,8 @@ import { DEFAULT_MAP_SETTINGS, MAP_SETTINGS_KEY, loadSavedMapSettings } from './
 
 export default function useAppController() {
   const [events, setEvents] = useState([]);
+  const [isEventsLoading, setIsEventsLoading] = useState(true);
+  const eventsRequestId = useRef(0);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [searchRadius, setSearchRadius] = useState(1500);
@@ -104,8 +106,38 @@ export default function useAppController() {
   }, [mapSettings.showUserLocation, isSearchingNearby]);
 
   useEffect(() => {
-    setDisplayEvents(events);
-  }, [events]);
+    if (!isSearchingNearby || !userLocation) return undefined;
+
+    const latitude = Number(userLocation.lat);
+    const longitude = Number(userLocation.lng);
+    const radius = Number(searchRadius);
+
+    if (
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude) ||
+      !Number.isFinite(radius) ||
+      radius <= 0
+    ) {
+      return undefined;
+    }
+
+    const requestId = ++eventsRequestId.current;
+    const timeoutId = setTimeout(async () => {
+      try {
+        const result = await fetchNearbyEvents(latitude, longitude, radius);
+
+        if (requestId === eventsRequestId.current) {
+          setEvents(result.data || []);
+        }
+      } catch (error) {
+        if (requestId === eventsRequestId.current) {
+          console.error('Failed to fetch nearby events:', error);
+        }
+      }
+    }, 250);
+
+    return () => clearTimeout(timeoutId);
+  }, [isSearchingNearby, userLocation, searchRadius]);
 
   const checkAuthSession = async () => {
     const accessToken = localStorage.getItem('accessToken');
@@ -157,8 +189,20 @@ export default function useAppController() {
     try {
       const result = await fetchNotifications();
 
-      setNotifications(result.data || []);
-      setUnreadNotificationsCount(Number(result.unreadCount) || 0);
+      const notificationItems = Array.isArray(result.data)
+        ? result.data
+        : [];
+
+      setNotifications(notificationItems);
+      setUnreadNotificationsCount(
+        notificationItems.filter(
+          (notification) =>
+            notification.is_read === false ||
+            notification.is_read === 0 ||
+            notification.is_read === '0' ||
+            notification.is_read === null
+        ).length
+      );
     } catch (error) {
       console.error('[Notifications Error]:', error);
       setNotificationsError('Failed to load notifications.');
@@ -234,7 +278,6 @@ export default function useAppController() {
 
         setEvents(allEvents);
         setIsSearchingNearby(false);
-        setUserLocation(null);
 
         matchingEvent = allEvents.find(matchesNotification);
       }
@@ -269,22 +312,22 @@ export default function useAppController() {
   };
 
   const loadGlobalEvents = async () => {
+    const requestId = ++eventsRequestId.current;
+    setIsSearchingNearby(false);
+    setIsEventsLoading(true);
+
     try {
       const result = await fetchAllEvents();
-      setEvents(result.data || []);
-      setIsSearchingNearby(false);
-      setUserLocation(null);
+
+      if (requestId === eventsRequestId.current) {
+        setEvents(result.data || []);
+      }
     } catch (err) {
       console.error('Failed to load global events:', err);
-    }
-  };
-
-  const loadNearbyEvents = async (lat, lng, radius) => {
-    try {
-      const result = await fetchNearbyEvents(lat, lng, radius);
-      setEvents(result.data || []);
-    } catch (err) {
-      console.error('Failed to fetch nearby events:', err);
+    } finally {
+      if (requestId === eventsRequestId.current) {
+        setIsEventsLoading(false);
+      }
     }
   };
 
@@ -301,7 +344,6 @@ export default function useAppController() {
 
         setUserLocation({ lat, lng });
         setIsSearchingNearby(true);
-        loadNearbyEvents(lat, lng, searchRadius);
       },
       () => alert('Unable to retrieve your location.')
     );
@@ -348,6 +390,7 @@ export default function useAppController() {
 
   return {
     events,
+    isEventsLoading,
     selectedEvent,
     setSelectedEvent,
     userLocation,

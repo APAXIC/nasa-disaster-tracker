@@ -41,7 +41,6 @@ function Map({
   const markerRefs = useRef(new globalThis.Map());
   const clusterRef = useRef(null);
 
-  // Avoid filtering the complete event collection on unrelated UI updates.
   const validEvents = useMemo(
     () =>
       events.filter((event) => {
@@ -92,7 +91,9 @@ function Map({
         minZoom={2}
         maxZoom={18}
         scrollWheelZoom
-        worldCopyJump={false}
+        worldCopyJump
+        maxBounds={[[-85, -180], [85, 180]]}
+        maxBoundsViscosity={1.0}
         className="z-0 h-full w-full"
         style={{
           cursor: isPickingWatchZoneLocation ? 'crosshair' : undefined
@@ -101,6 +102,7 @@ function Map({
         <MapClickHandler
           enabled={isPickingWatchZoneLocation}
           onLocationSelect={onWatchZoneLocationSelect}
+          onMapClick={() => onSelectEvent?.(null)}
         />
         <TileLayer
           key={`${mapStyle}-${settings.theme}`}
@@ -160,6 +162,7 @@ function Map({
             onSelectEvent={onSelectEvent}
             markerRefs={markerRefs}
             clusterRef={clusterRef}
+            userLocation={userLocation}
           />
         )}
 
@@ -252,6 +255,7 @@ function Map({
           );
         })()}
       </MapContainer>
+
     </div>
   );
 }
