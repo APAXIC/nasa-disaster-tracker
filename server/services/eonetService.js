@@ -21,19 +21,25 @@ async function syncEonetEvents() {
     }
 
     const events = response.data.events;
-    const incomingIds = [...new Set(
-      events
-        .map((event) => event.id)
-        .filter((id) => typeof id === 'string' && id.length > 0)
-    )];
+
+    const incomingIds = [
+      ...new Set(
+        events
+          .map((event) => event.id)
+          .filter((id) => typeof id === 'string' && id.length > 0)
+      )
+    ];
 
     console.log(`[EONET Sync] Retrieved ${events.length} events from NASA.`);
 
     let insertedCount = 0;
+    let updatedCount = 0;
+    let skippedCount = 0;
 
     for (const event of events) {
       if (!event.id) {
         console.warn('[EONET Sync] Skipping event without an ID.');
+        skippedCount += 1;
         continue;
       }
 
@@ -41,150 +47,190 @@ async function syncEonetEvents() {
         ? event.geometry
         : [];
 
-      const latestGeo = geometry[geometry.length - 1];
-      const coordinates = latestGeo?.coordinates;
+      const validPoints = geometry.filter((point) => {
+        const coordinates = point?.coordinates;
 
-      if (!coordinates || coordinates.length < 2) {
-        console.warn(
-          `[EONET Sync] Skipping insertion for ${event.id}: no usable location.`
+        if (!Array.isArray(coordinates) || coordinates.length < 2) {
+          return false;
+        }
+
+        const [longitude, latitude] = coordinates;
+
+        return (
+          Number.isFinite(longitude) &&
+          Number.isFinite(latitude) &&
+          longitude >= -180 &&
+          longitude <= 180 &&
+          latitude >= -90 &&
+          latitude <= 90
         );
+      });
+
+      if (validPoints.length === 0) {
+        console.warn(
+          `[EONET Sync] Skipping ${event.id}: no usable location.`
+        );
+        skippedCount += 1;
         continue;
       }
 
-      const [longitude, latitude] = coordinates;
+      const latestPoint = validPoints[validPoints.length - 1];
+      const [longitude, latitude] = latestPoint.coordinates;
 
-      if (
-        !Number.isFinite(longitude) ||
-        !Number.isFinite(latitude) ||
-        longitude < -180 ||
-        longitude > 180 ||
-        latitude < -90 ||
-        latitude > 90
-      ) {
-        console.warn(
-          `[EONET Sync] Skipping insertion for ${event.id}: invalid coordinates.`
-        );
-        continue;
-      }
+      const syncResult = await db.transaction(async (trx) => {
+        const existingEvent = await trx('events')
+          .where({ nasa_id: event.id })
+          .first('id');
 
-      const insertedRows = await db('events')
-        .insert({
-          nasa_id: event.id,
-          title: event.title,
+        let eventId;
+
+        const eventData = {
+          title: event.title || 'Untitled event',
           description: event.description || '',
           link: event.link || '',
           closed_at: event.closed ? new Date(event.closed) : null,
-          latest_location: db.raw(
+          latest_location: trx.raw(
             'ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography',
             [longitude, latitude]
           ),
-          last_synced_at: db.fn.now()
-        })
-        .onConflict('nasa_id')
-        .ignore()
-        .returning(['id', 'nasa_id']);
+          last_synced_at: trx.fn.now()
+        };
 
-      const insertedEvent = insertedRows[0];
+        if (existingEvent) {
+          eventId = existingEvent.id;
 
-      if (!insertedEvent) {
-        continue;
-      }
+          await trx('events')
+            .where({ id: eventId })
+            .update(eventData);
+        } else {
+          const [insertedEvent] = await trx('events')
+            .insert({
+              nasa_id: event.id,
+              ...eventData
+            })
+            .returning(['id']);
 
-      insertedCount += 1;
+          eventId = insertedEvent.id;
+        }
 
-      if (Array.isArray(event.categories)) {
-        for (const category of event.categories) {
-          if (!category.id || !category.title) {
-            continue;
-          }
+        const categories = Array.isArray(event.categories)
+          ? event.categories
+          : [];
 
-          await db('categories')
+        const validCategories = categories.filter(
+          (category) =>
+            category &&
+            typeof category.id === 'string' &&
+            category.id.length > 0 &&
+            typeof category.title === 'string' &&
+            category.title.length > 0
+        );
+
+        for (const category of validCategories) {
+          await trx('categories')
             .insert({
               id: category.id,
               title: category.title
             })
             .onConflict('id')
-            .ignore();
+            .merge({ title: category.title });
+        }
 
-          await db('event_categories')
-            .insert({
-              event_id: insertedEvent.id,
+        await trx('event_categories')
+          .where({ event_id: eventId })
+          .del();
+
+        if (validCategories.length > 0) {
+          await trx('event_categories').insert(
+            validCategories.map((category) => ({
+              event_id: eventId,
               category_id: category.id
-            })
-            .onConflict(['event_id', 'category_id'])
-            .ignore();
+            }))
+          );
         }
+
+        await trx('event_geometries')
+          .where({ event_id: eventId })
+          .del();
+
+        const geometryRows = [];
+
+        for (const point of validPoints) {
+          const [pointLongitude, pointLatitude] = point.coordinates;
+
+          const recordedAt = point.date
+            ? new Date(point.date)
+            : new Date();
+
+          if (Number.isNaN(recordedAt.getTime())) {
+            continue;
+          }
+
+          geometryRows.push({
+            event_id: eventId,
+            recorded_at: recordedAt,
+            location: trx.raw(
+              'ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography',
+              [pointLongitude, pointLatitude]
+            ),
+            magnitude_value:
+              Number.isFinite(point.magnitudeValue)
+                ? point.magnitudeValue
+                : null,
+            magnitude_unit:
+              typeof point.magnitudeUnit === 'string'
+                ? point.magnitudeUnit
+                : null
+          });
+        }
+
+        if (geometryRows.length > 0) {
+          await trx('event_geometries').insert(geometryRows);
+        }
+
+        return {
+          eventId,
+          wasInserted: !existingEvent
+        };
+      });
+
+      if (syncResult.wasInserted) {
+        insertedCount += 1;
+      } else {
+        updatedCount += 1;
       }
 
-      for (const point of geometry) {
-        const pointCoordinates = point.coordinates;
-
-        if (
-          !Array.isArray(pointCoordinates) ||
-          pointCoordinates.length < 2
-        ) {
-          continue;
-        }
-
-        const [pointLongitude, pointLatitude] = pointCoordinates;
-
-        if (
-          !Number.isFinite(pointLongitude) ||
-          !Number.isFinite(pointLatitude) ||
-          pointLongitude < -180 ||
-          pointLongitude > 180 ||
-          pointLatitude < -90 ||
-          pointLatitude > 90
-        ) {
-          continue;
-        }
-
-        const recordedAt = point.date
-          ? new Date(point.date)
-          : new Date();
-
-        if (Number.isNaN(recordedAt.getTime())) {
-          continue;
-        }
-
-        await db('event_geometries').insert({
-          event_id: insertedEvent.id,
-          recorded_at: recordedAt,
-          location: db.raw(
-            'ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography',
-            [pointLongitude, pointLatitude]
-          ),
-          magnitude_value: point.magnitudeValue ?? null,
-          magnitude_unit: point.magnitudeUnit ?? null
-        });
-      }
-
-      if (!event.closed) {
+      if (syncResult.wasInserted && !event.closed) {
         await processWatchZoneAlerts(
-          insertedEvent.id,
-          event.title,
+          syncResult.eventId,
+          event.title || 'Untitled event',
           longitude,
           latitude
         );
       }
     }
 
-    let closureQuery = db('events')
-      .whereNull('closed_at');
-
     if (incomingIds.length > 0) {
-      closureQuery = closureQuery.whereNotIn('nasa_id', incomingIds);
+      const closedCount = await db('events')
+        .whereNull('closed_at')
+        .whereNotIn('nasa_id', incomingIds)
+        .update({ closed_at: db.fn.now() });
+
+      console.log(
+        `[EONET Sync] Marked closed: ${closedCount}.`
+      );
+    } else {
+      console.warn(
+        '[EONET Sync] No event IDs received; skipping automatic closure.'
+      );
     }
 
-    const closedCount = await closureQuery.update({
-      closed_at: db.fn.now()
-    });
-
     console.log(
-      `[EONET Sync] Completed. Inserted: ${insertedCount}; marked closed: ${closedCount}.`
+      `[EONET Sync] Completed. Inserted: ${insertedCount}; ` +
+      `updated: ${updatedCount}; skipped: ${skippedCount}.`
     );
   } catch (error) {
-    console.error('[EONET Sync Error]:', error.message);
+    console.error('[EONET Sync Error]:', error);
   }
 }
 
