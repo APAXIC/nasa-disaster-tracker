@@ -1,3 +1,4 @@
+import LoadingSpinner from './components/ui/LoadingSpinner.jsx';
 import Map from './features/map/Map.jsx';
 import AuthModal from './features/auth/AuthModal.jsx';
 import AppShell from './components/layout/AppShell.jsx';
@@ -67,8 +68,7 @@ export default function App() {
           aria-live="polite"
         >
           <div className="flex items-center gap-3 rounded-xl border border-gray-700 bg-gray-900/95 px-5 py-4 text-sm font-medium text-white shadow-2xl">
-            <span className="h-5 w-5 animate-spin rounded-full border-2 border-gray-600 border-t-orange-400" />
-            Loading disaster events...
+            <LoadingSpinner label="Loading disaster events..." />
           </div>
         </div>
       )}

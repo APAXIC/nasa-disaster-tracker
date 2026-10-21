@@ -126,7 +126,6 @@ html[data-theme='light'] [class*='text-gray-600'] {
   color: #4b5563 !important;
 }
 
-/* Light theme: borders */
 html[data-theme='light'] [class*='border-gray-700'],
 html[data-theme='light'] [class*='border-gray-800'],
 html[data-theme='light'] [class*='border-gray-900'] {

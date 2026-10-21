@@ -4,7 +4,7 @@ import {
   MapPinIcon,
   ArrowPathIcon
 } from '@heroicons/react/24/outline';
-import { fetchHistoricalCategories } from '../../services/eventsApi.js';
+import { fetchHistoricalCategories } from './api.js';
 import {
   getDistance,
   getEventCategories,
@@ -47,6 +47,7 @@ function sortEvents(events, sortBy, userLocation) {
     return events;
   }
 
+  // Calculate expensive sort keys once per event instead of inside the comparator.
   const decorated = events.map((event) => ({
     event,
     date: sortBy === 'newest' || sortBy === 'oldest'

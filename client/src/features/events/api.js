@@ -1,4 +1,4 @@
-import apiClient from './apiClient';
+import apiClient from '../../lib/apiClient.js';
 
 export const fetchAllEvents = async () => {
   const response = await apiClient.get('/events');
