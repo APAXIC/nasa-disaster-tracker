@@ -38,7 +38,6 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div className="relative w-full max-w-md p-6 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl text-white">
 
-        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1 text-gray-400 hover:text-white rounded-lg transition"
@@ -46,7 +45,6 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
           <XMarkIcon className="w-5 h-5" />
         </button>
 
-        {/* Tab Toggle Header */}
         <div className="flex border-b border-gray-800 mb-6">
           <button
             onClick={() => { setIsLogin(true); setError(''); }}
@@ -66,14 +64,12 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
           </button>
         </div>
 
-        {/* Error Banner */}
         {error && (
           <div className="p-3 mb-4 text-xs font-medium text-red-400 bg-red-950/50 border border-red-800/60 rounded-lg">
             {error}
           </div>
         )}
 
-        {/* Auth Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <div>

@@ -25,8 +25,11 @@ export const loginUser = async (email, password) => {
 };
 
 export const logoutUser = async () => {
-  await apiClient.post('/auth/logout');
-  localStorage.removeItem('accessToken');
+  try {
+    await apiClient.post('/auth/logout');
+  } finally {
+    localStorage.removeItem('accessToken');
+  }
 };
 
 export const fetchCurrentUser = async () => {

@@ -20,7 +20,7 @@ exports.issueTokens = async (user) => {
   );
 
   const refreshToken = jwt.sign(
-    { userId: user.id },
+    { userId: user.id, jti: crypto.randomUUID() },
     process.env.JWT_REFRESH_SECRET,
     { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
   );
@@ -44,10 +44,11 @@ exports.rotateRefreshToken = async (oldRefreshToken) => {
   const decoded = jwt.verify(oldRefreshToken, process.env.JWT_REFRESH_SECRET);
   const tokenHash = hashToken(oldRefreshToken);
 
-  const storedToken = await db('refresh_tokens')
+  const [storedToken] = await db('refresh_tokens')
     .where({ user_id: decoded.userId, token_hash: tokenHash })
     .andWhere('expires_at', '>', new Date())
-    .first();
+    .del()
+    .returning(['id']);
 
   if (!storedToken) {
     throw new Error('Invalid or revoked refresh token');
@@ -58,7 +59,6 @@ exports.rotateRefreshToken = async (oldRefreshToken) => {
     throw new Error('User no longer exists');
   }
 
-  await db('refresh_tokens').where({ id: storedToken.id }).del();
 
   return await exports.issueTokens(user);
 };

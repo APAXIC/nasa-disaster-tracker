@@ -41,7 +41,6 @@ function Map({
   const markerRefs = useRef(new globalThis.Map());
   const clusterRef = useRef(null);
 
-  // Avoid filtering the complete event collection on unrelated UI updates.
   const validEvents = useMemo(
     () =>
       events.filter((event) => {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchCurrentUser, logoutUser } from './api.js';
+import { refreshAccessToken } from '../../lib/apiClient.js';
 
 export default function useAuth() {
   const [user, setUser] = useState(null);
@@ -13,8 +14,12 @@ export default function useAuth() {
     const accessToken = localStorage.getItem('accessToken');
 
     if (!accessToken) {
-      setUser(null);
-      return;
+      try {
+        await refreshAccessToken();
+      } catch {
+        setUser(null);
+        return;
+      }
     }
 
     try {

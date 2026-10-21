@@ -47,7 +47,6 @@ function sortEvents(events, sortBy, userLocation) {
     return events;
   }
 
-  // Calculate expensive sort keys once per event instead of inside the comparator.
   const decorated = events.map((event) => ({
     event,
     date: sortBy === 'newest' || sortBy === 'oldest'
