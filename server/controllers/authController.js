@@ -88,7 +88,7 @@ exports.login = async (req, res) => {
  * Refresh Access Token Endpoint (Rotates refresh token & checks DB)
  */
 exports.refreshToken = async (req, res) => {
-  const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+  const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
   if (!refreshToken) {
     return res.status(401).json({ error: 'Refresh token required' });
@@ -114,7 +114,7 @@ exports.refreshToken = async (req, res) => {
  * Logout User (Revokes refresh token in DB & clears cookie)
  */
 exports.logout = async (req, res) => {
-  const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+  const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
   if (refreshToken) {
     await revokeRefreshToken(refreshToken);

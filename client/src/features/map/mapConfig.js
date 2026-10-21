@@ -1,5 +1,5 @@
 import L from 'leaflet';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import { getCategoryStyle } from '../events/categoryStyle.js';
 
 export const MAP_VIEW_KEY = 'disaster-map-view';
 
@@ -33,11 +33,25 @@ export const TILE_LAYERS = {
   }
 };
 
-export const defaultIcon = L.icon({
-  iconUrl: markerIcon,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41]
-});
+const eventIconCache = new Map();
+
+export function getEventMarkerIcon(event, selected = false) {
+  const category = event?.categories?.[0];
+  const style = getCategoryStyle(category);
+  const key = `${style.type}-${selected}`;
+  if (eventIconCache.has(key)) return eventIconCache.get(key);
+
+  const size = selected ? 42 : 34;
+  const icon = L.divIcon({
+    className: 'disaster-marker-wrapper',
+    html: `<div class="disaster-marker ${selected ? 'is-selected' : ''}" style="--marker-color:${style.color}"><span class="category-icon-asset" style="color:${style.color}"><span class="category-icon-fallback" style="visibility:hidden">${style.icon}</span><span class="category-icon-mask" style="-webkit-mask-image:url('${style.iconUrl}');mask-image:url('${style.iconUrl}')"></span><img class="category-icon-probe" src="${style.iconUrl}" alt="" onerror="this.previousElementSibling.style.display='none';this.parentElement.querySelector('.category-icon-fallback').style.visibility='visible'" /></span></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2]
+  });
+  eventIconCache.set(key, icon);
+  return icon;
+}
 
 export const userLocationIcon = L.divIcon({
   className: 'user-location-marker',

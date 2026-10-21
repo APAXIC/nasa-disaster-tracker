@@ -5,124 +5,125 @@ import {
   MoonIcon,
   ArrowPathIcon,
   EyeIcon,
-  MapPinIcon
+  MapPinIcon,
+  CheckIcon
 } from '@heroicons/react/24/outline';
 
-const selectClass =
-  'w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white';
+const mapOptions = [
+  { id: 'standard', label: 'Standard', preview: '/map-previews/standard.jpg' },
+  { id: 'topographic', label: 'Topographic', preview: '/map-previews/topographic.jpg' },
+  { id: 'satellite', label: 'Satellite', preview: '/map-previews/satellite.jpg' }
+];
 
-
-export default function SettingsPanel({
-                                        settings,
-                                        onChange,
-                                        onReset,
-                                        isAuthenticated = false
-                                      }) {
+export default function SettingsPanel({ settings, onChange, onReset, isAuthenticated = false }) {
   const updateSetting = (key, value) => {
-    onChange((current) => ({
-      ...current,
-      [key]: value
-    }));
+    onChange((current) => ({ ...current, [key]: value }));
   };
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-3">
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-100">
-          <MapIcon className="h-4 w-4 text-blue-400" />
-          Map appearance
+    <div className="settings-panel">
+      <section className="settings-section">
+        <h3 className="settings-section-title">
+          <MapIcon className="h-5 w-5" /> Map appearance
         </h3>
 
-        <label className="block space-y-1.5">
-          <span className="text-xs text-gray-400">Map style</span>
-          <select
-            value={settings.mapStyle}
-            onChange={(event) =>
-              updateSetting('mapStyle', event.target.value)
-            }
-            className={selectClass}
-          >
-            <option value="standard">Standard</option>
-            <option value="satellite">Satellite</option>
-            <option value="topographic">Topographic</option>
-          </select>
-        </label>
+        <fieldset className="settings-fieldset">
+          <legend className="settings-field-label">Map style</legend>
+          <div className="settings-map-grid">
+            {mapOptions.map((option) => {
+              const selected = settings.mapStyle === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={`settings-map-option ${selected ? 'is-active' : ''}`}
+                  onClick={() => updateSetting('mapStyle', option.id)}
+                  aria-pressed={selected}
+                  title={`${option.label} map`}
+                >
+                  <span className={`settings-map-thumbnail settings-map-thumbnail-${option.id}`}>
+                    <img
+                      src={option.preview}
+                      alt=""
+                      loading="lazy"
+                      onError={(event) => { event.currentTarget.style.display = 'none'; }}
+                    />
+                    {selected && (
+                      <span className="settings-map-check" aria-hidden="true">
+                        <CheckIcon className="h-4 w-4" />
+                      </span>
+                    )}
+                  </span>
+                  <span className="settings-map-name">{option.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
 
-        <label className="block space-y-1.5">
-          <span className="text-xs text-gray-400">Application theme</span>
-          <select
-            value={settings.theme}
-            onChange={(event) =>
-              updateSetting('theme', event.target.value)
-            }
-            className={selectClass}
-          >
-            <option value="dark">Dark</option>
-            <option value="light">Light</option>
-          </select>
-        </label>
+        <fieldset className="settings-fieldset">
+          <legend className="settings-field-label">Application theme</legend>
+          <div className="settings-theme-options">
+            <button
+              type="button"
+              className={`settings-theme-option ${settings.theme === 'dark' ? 'is-active' : ''}`}
+              aria-pressed={settings.theme === 'dark'}
+              onClick={() => updateSetting('theme', 'dark')}
+            >
+              <MoonIcon className="h-5 w-5" /> Dark
+            </button>
+            <button
+              type="button"
+              className={`settings-theme-option ${settings.theme === 'light' ? 'is-active' : ''}`}
+              aria-pressed={settings.theme === 'light'}
+              onClick={() => updateSetting('theme', 'light')}
+            >
+              <SunIcon className="h-5 w-5" /> Light
+            </button>
+          </div>
+        </fieldset>
       </section>
 
-      <section className="space-y-3">
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-100">
-          <EyeIcon className="h-4 w-4 text-blue-400" />
-          Map layers
-        </h3>
-
-        <SettingToggle
-          label="Disaster events"
-          description="Show event markers on the map."
-          checked={settings.showEvents}
-          onChange={(value) => updateSetting('showEvents', value)}
-        />
-
-        <SettingToggle
-          label="Your location"
-          description="Show your location and the selected search radius when location data is available."
-          checked={settings.showUserLocation}
-          onChange={(value) => updateSetting('showUserLocation', value)}
-        />
-
-        <SettingToggle
-          label="Watch zones"
-          description={
-            isAuthenticated
-              ? 'Show your saved monitoring zones.'
-              : 'Sign in to view your personal watch zones.'
-          }
-          checked={isAuthenticated && settings.showWatchZones}
-          disabled={!isAuthenticated}
-          onChange={(value) => updateSetting('showWatchZones', value)}
-        />
-
-        {!isAuthenticated && (
-          <p className="text-xs leading-5 text-gray-500">
-            Watch zones are available only to signed-in users.
-          </p>
-        )}
+      <section className="settings-section">
+        <h3 className="settings-section-title"><EyeIcon className="h-5 w-5" /> Map layers</h3>
+        <div className="settings-toggle-list">
+          <SettingToggle
+            label="Disaster events"
+            description="Show event markers on the map."
+            checked={settings.showEvents}
+            onChange={(value) => updateSetting('showEvents', value)}
+          />
+          <SettingToggle
+            label="Your location"
+            description="Show your location and the selected search radius when location data is available."
+            checked={settings.showUserLocation}
+            onChange={(value) => updateSetting('showUserLocation', value)}
+          />
+          <SettingToggle
+            label="Watch zones"
+            description={isAuthenticated ? 'Show your saved monitoring zones.' : 'Sign in to view your personal watch zones.'}
+            checked={isAuthenticated && settings.showWatchZones}
+            disabled={!isAuthenticated}
+            onChange={(value) => updateSetting('showWatchZones', value)}
+          />
+          {!isAuthenticated && <p className="settings-note">Watch zones are available only to signed-in users.</p>}
+        </div>
       </section>
 
-      <section className="space-y-3">
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-100">
-          <MapPinIcon className="h-4 w-4 text-blue-400" />
-          Map behavior
-        </h3>
-
-        <SettingToggle
-          label="Remember map view"
-          description="Save the map center and zoom between visits."
-          checked={settings.rememberMapView}
-          onChange={(value) => updateSetting('rememberMapView', value)}
-        />
+      <section className="settings-section">
+        <h3 className="settings-section-title"><MapPinIcon className="h-5 w-5" /> Map behavior</h3>
+        <div className="settings-toggle-list">
+          <SettingToggle
+            label="Remember map view"
+            description="Save the map center and zoom between visits."
+            checked={settings.rememberMapView}
+            onChange={(value) => updateSetting('rememberMapView', value)}
+          />
+        </div>
       </section>
 
-      <button
-        type="button"
-        onClick={onReset}
-        className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-700 px-3 py-2.5 text-sm font-medium text-gray-300 transition hover:bg-gray-800 hover:text-white"
-      >
-        <ArrowPathIcon className="h-4 w-4" />
-        Reset settings
+      <button type="button" onClick={onReset} className="settings-reset-button">
+        <ArrowPathIcon className="h-5 w-5" /> Reset settings
       </button>
     </div>
   );

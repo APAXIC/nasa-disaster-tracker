@@ -5,19 +5,19 @@ export default function FloatingPanel({
   icon: Icon,
   onClose,
   children,
-  width = 'w-[min(24rem,calc(100vw-5rem))]'
+  width = 'w-[min(27rem,calc(100vw-6.5rem))]'
 }) {
   return (
     <section
       aria-label={title}
-      className={`absolute left-16 top-0 z-30 flex h-full max-h-screen ${width} flex-col overflow-hidden border-r border-gray-700/70 bg-gray-900/95 text-white shadow-2xl backdrop-blur-xl`}
+      className={`modern-floating-panel absolute left-[5.75rem] top-5 z-30 flex max-h-[calc(100dvh-2.5rem)] ${width} flex-col overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-950/95 text-white shadow-2xl backdrop-blur-xl`}
     >
-      <header className="flex shrink-0 items-center justify-between border-b border-gray-800 px-5 py-4">
+      <header className="flex shrink-0 items-center justify-between border-b border-slate-700/40 px-6 py-5">
         <div className="flex min-w-0 items-center gap-3">
           {Icon && (
-            <Icon className="h-5 w-5 shrink-0 text-orange-400" />
+            <Icon className="h-5 w-5 shrink-0 text-blue-400" />
           )}
-          <h2 className="truncate text-base font-semibold">{title}</h2>
+          <h2 className="truncate text-xl font-semibold">{title}</h2>
         </div>
 
         <button
@@ -30,7 +30,7 @@ export default function FloatingPanel({
         </button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 sm:px-7 sm:py-7">
         {children}
       </div>
     </section>

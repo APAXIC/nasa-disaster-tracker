@@ -5,7 +5,6 @@ import {
   MapPinIcon,
   BellIcon,
   AdjustmentsHorizontalIcon,
-  XMarkIcon,
   ChartBarIcon
 } from '@heroicons/react/24/outline';
 
@@ -13,8 +12,8 @@ const navigationItems = [
   { id: 'events', label: 'Events', icon: ExclamationTriangleIcon },
   { id: 'watch-zones', label: 'Watch Zones', icon: MapPinIcon },
   { id: 'notifications', label: 'Notifications', icon: BellIcon },
-  { id: 'settings', label: 'Settings', icon: AdjustmentsHorizontalIcon },
-  { id: 'statistics', label: 'Statistics & History', icon: ChartBarIcon }
+  { id: 'statistics', label: 'Statistics & History', icon: ChartBarIcon },
+  { id: 'settings', label: 'Settings', icon: AdjustmentsHorizontalIcon }
 ];
 
 function SidebarButton({
@@ -33,7 +32,7 @@ function SidebarButton({
       onClick={onClick}
       className={`relative flex h-12 w-12 items-center justify-center rounded-xl transition ${
         active
-          ? 'bg-gray-100 text-gray-950'
+          ? 'bg-blue-500/25 text-blue-300 ring-1 ring-blue-400/50'
           : 'text-gray-400 hover:bg-gray-800 hover:text-white'
       }`}
     >
@@ -63,17 +62,20 @@ export default function Sidebar({
   return (
     <nav
       aria-label="Main navigation"
-      className="absolute inset-y-0 left-0 z-40 flex w-16 flex-col items-center border-r border-gray-800 bg-gray-950/95 py-3 backdrop-blur-xl"
+      className="absolute inset-y-0 left-0 z-40 flex w-16 flex-col items-center border-r border-slate-700/40 bg-slate-950/90 py-5 backdrop-blur-xl"
     >
-      <div className="mb-5">
-        <SidebarButton
-          label="Close active panel"
-          icon={XMarkIcon}
-          active={activePanel === null}
-          onClick={() => onPanelChange(null)}
-        />
+      <div className="sidebar-brand" aria-label="EONET Tracker">
+        <span className="sidebar-brand-logo">
+          <img
+            src="/nasa-logo.png"
+            alt="NASA"
+            onLoad={(event) => { event.currentTarget.nextElementSibling.style.visibility = 'hidden'; }}
+            onError={(event) => { event.currentTarget.style.display = 'none'; }}
+          />
+          <span className="sidebar-brand-fallback" aria-hidden="true">🌐</span>
+        </span>
+        <span className="sidebar-brand-name">EONET<br />TRACKER</span>
       </div>
-
       <div className="flex flex-1 flex-col items-center gap-2">
         {navigationItems.map(({ id, label, icon }) => (
           <SidebarButton

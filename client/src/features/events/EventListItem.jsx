@@ -1,4 +1,6 @@
 import { memo, useCallback } from 'react';
+import { getCategoryStyle } from './categoryStyle.js';
+import CategoryIcon from './CategoryIcon.jsx';
 import {
   formatEventDate,
   getDistance,
@@ -29,49 +31,29 @@ function EventListItem({ event, isSelected, userLocation, cardRefs, onSelectEven
     .map((category) => category.title)
     .join(', ');
 
+  const style = getCategoryStyle(getEventCategories(event)[0]);
+
   return (
-    <button
-      ref={setCardRef}
-      type="button"
-      onClick={handleClick}
-      aria-pressed={isSelected}
-      className={`w-full rounded-xl border p-3 text-left transition ${
-        isSelected
-          ? 'border-orange-500 bg-orange-500/10'
-          : 'border-gray-800 bg-gray-900/60 hover:border-gray-700 hover:bg-gray-800/70'
-      }`}
-    >
-      <span className="block text-sm font-medium text-gray-100">
-        {event.title}
-      </span>
-
-      {categoryTitles && (
-        <span className="mt-1 block text-xs text-gray-400">
-          {categoryTitles}
+    <button ref={setCardRef} type="button" onClick={handleClick} aria-pressed={isSelected}
+      className={`event-card ${isSelected ? 'is-selected' : ''}`}>
+      <span className="event-card-icon" style={{ color: style.color, borderColor: `${style.color}55`, background: `${style.color}13` }}
+        aria-hidden="true"><CategoryIcon category={getEventCategories(event)[0]} /></span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-start justify-between gap-2">
+          <span className="block text-sm font-semibold leading-snug text-slate-100">{event.title}</span>
+          <span className="event-category-label" style={{ color: style.color, background: `${style.color}20` }}>
+            {getEventCategories(event)[0]?.title || 'Event'}
+          </span>
         </span>
-      )}
-
-      <span className="mt-1 block text-xs text-gray-400">
-        Date: {formatEventDate(eventDate)}
-      </span>
-
-      <span className="mt-1 block text-xs text-orange-300">
-        {magnitude
-          ? `Magnitude: ${magnitude.value}${magnitude.unit ? ` ${magnitude.unit}` : ''}`
-          : 'Magnitude: unavailable'}
-      </span>
-
-      {distance !== null ? (
-        <span className="mt-1 block text-xs text-blue-400">
-          {distance < 10
-            ? `${distance.toFixed(1)} km from you`
-            : `${Math.round(distance)} km from you`}
+        {categoryTitles && <span className="mt-1 block text-xs text-slate-400">{categoryTitles}</span>}
+        <span className="mt-1 block text-xs text-slate-400">Date: {formatEventDate(eventDate)}</span>
+        <span className="mt-1 block text-xs text-amber-300">
+          {magnitude ? `Magnitude: ${magnitude.value}${magnitude.unit ? ` ${magnitude.unit}` : ''}` : 'Magnitude: unavailable'}
         </span>
-      ) : (
-        <span className="mt-1 block text-xs text-gray-500">
-          Distance unavailable
+        <span className="mt-1 block text-xs text-sky-400">
+          {distance !== null ? `${distance < 10 ? distance.toFixed(1) : Math.round(distance)} km from you` : 'Distance unavailable'}
         </span>
-      )}
+      </span>
     </button>
   );
 }

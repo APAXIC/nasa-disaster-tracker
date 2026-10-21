@@ -398,8 +398,8 @@ export default function StatisticsPanel({ userLocation }) {
   );
 
   return (
-    <section className="space-y-5 text-sm text-gray-200">
-      <div>
+    <section className="statistics-panel">
+      <div className="statistics-intro">
         <p className="text-xs uppercase tracking-widest text-gray-500">
           NASA EONET
         </p>

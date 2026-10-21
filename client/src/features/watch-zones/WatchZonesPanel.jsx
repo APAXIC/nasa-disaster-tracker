@@ -287,8 +287,8 @@ export default function WatchZonesPanel({
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
+    <div className="watch-zones-panel space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-sm text-gray-300">
             Monitor locations that matter to you.
@@ -302,7 +302,7 @@ export default function WatchZonesPanel({
           type="button"
           onClick={openCreateForm}
           disabled={isSubmitting}
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-orange-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-500 disabled:opacity-50"
+          className="watch-zone-add inline-flex shrink-0 items-center justify-center rounded-xl bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50"
         >
           <PlusIcon className="h-4 w-4" />
           Add
@@ -343,7 +343,7 @@ export default function WatchZonesPanel({
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {watchZones.map((zone) => (
             <WatchZoneCard
               key={zone.id}

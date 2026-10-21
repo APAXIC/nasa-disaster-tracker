@@ -1,7 +1,8 @@
+import L from 'leaflet';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
-import { defaultIcon, selectedEventIcon } from '../mapConfig.js';
+import { getEventMarkerIcon } from '../mapConfig.js';
 import SelectedEventController from './SelectedEventController.jsx';
 import {
   formatEventDate,
@@ -85,6 +86,16 @@ function EventMarkersLayer({
       <MarkerClusterGroup
         ref={clusterRef}
         chunkedLoading
+        iconCreateFunction={(cluster) => {
+          const count = cluster.getChildCount();
+          const tier = count < 10 ? 'small' : count < 100 ? 'medium' : 'large';
+          return L.divIcon({
+            html: `<span>${count}</span>`,
+            className: `disaster-cluster disaster-cluster-${tier}`,
+            iconSize: [42, 42],
+            iconAnchor: [21, 21]
+          });
+        }}
         maxClusterRadius={60}
         spiderfyOnMaxZoom
         showCoverageOnHover={false}
@@ -105,7 +116,7 @@ function EventMarkersLayer({
                 }
               }}
               position={[Number(event.latitude), Number(event.longitude)]}
-              icon={isSelected ? selectedEventIcon : defaultIcon}
+              icon={getEventMarkerIcon(event, isSelected)}
               zIndexOffset={isSelected ? 1000 : 0}
               eventHandlers={{
                 click: () => onSelectEvent?.(event)
