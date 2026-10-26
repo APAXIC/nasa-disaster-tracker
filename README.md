@@ -1,10 +1,10 @@
-# EONET Watch
+# EONET Tracker
 
-**EONET Watch** is a full-stack web application for exploring and monitoring natural events around the world. It combines NASA's Earth Observatory Natural Event Tracker (EONET) data with an interactive map, location-based searches, and personal monitoring tools. Visitors can browse events without an account, while registered users can create watch zones and manage notifications.
+**EONET Tracker** is a full-stack web application for exploring and monitoring natural events around the world. It combines NASA's Earth Observatory Natural Event Tracker (EONET) data with an interactive map, location-based searches, and personal monitoring tools. Visitors can browse events without an account, while registered users can create watch zones and manage notifications.
 
 The project was developed to explore full-stack application architecture, third-party API integration, geospatial data processing, and deployment. It brings together a React interface, an Express REST API, scheduled data synchronization, PostgreSQL with PostGIS, and containerized backend development.
 
-**Live application:** [EONET Watch](https://nasa-disaster-tracker-1.onrender.com/)
+**Live application:** [EONET Tracker](https://nasa-disaster-tracker-1.onrender.com/)
 
 ## Features
 
@@ -48,7 +48,7 @@ The project was developed to explore full-stack application architecture, third-
 
 ## How It Works
 
-EONET Watch separates the user interface, API logic, and persistent data storage:
+EONET Tracker separates the user interface, API logic, and persistent data storage:
 
 1. **React frontend** renders the map and application controls, requests event data, and provides authenticated monitoring features.
 2. **Express API** exposes endpoints for events, authentication, watch zones, and notifications. Controllers handle HTTP requests while services contain reusable application and data-access logic.
